@@ -36,9 +36,25 @@
   .credit a { color: inherit; }
   details summary { cursor: pointer; font-size: 12px; color: #45566a; margin-top: 8px; }
   details p { font-size: 11.5px; color: #6b7c8e; margin: 6px 0 0; line-height: 1.55; }
+
+  /* 냄새 체크 카드 */
+  #smell-card {
+    position: absolute; left: 12px; bottom: 28px; z-index: 10;
+    background: var(--panel-bg); border-radius: 12px; padding: 12px 16px;
+    box-shadow: 0 2px 12px rgba(0,0,0,.18); max-width: 320px; backdrop-filter: blur(4px);
+    display: none;
+  }
+  #smell-card.show { display: block; }
+  #smell-card .grade { font-size: 17px; font-weight: 700; margin: 0 0 4px; display: flex; align-items: center; gap: 7px; }
+  #smell-card .grade .dot { width: 13px; height: 13px; border-radius: 50%; }
+  #smell-card .detail { font-size: 12.5px; color: #45566a; margin: 0; line-height: 1.6; }
+  #smell-card .season { font-size: 11.5px; color: #6b7c8e; margin: 6px 0 0; border-top: 1px solid #e3e9ef; padding-top: 6px; line-height: 1.5; }
+  #smell-card .where { font-size: 11px; color: #8494a5; margin: 2px 0 6px; }
+  .hint { font-size: 11.5px; color: #6b7c8e; margin: 8px 0 0; border-top: 1px solid #e3e9ef; padding-top: 8px; line-height: 1.5; }
   @media (max-width: 480px) {
     .panel { max-width: calc(100vw - 24px); padding: 12px 14px; }
     .panel h1 { font-size: 17px; }
+    #smell-card { max-width: calc(100vw - 24px); }
   }
 </style>
 </head>
@@ -52,15 +68,24 @@
     <span class="swatch female"></span> 암나무 (열매·냄새 발생) <span class="count" id="count-female"></span></label>
   <label class="layer-row"><input type="checkbox" id="toggle-unknown" checked>
     <span class="swatch unknown"></span> 은행나무 (암수 미표기) <span class="count" id="count-unknown"></span></label>
+  <p class="hint">지도를 탭하거나 오른쪽 위 <b>⌖ 내 위치</b> 버튼을 누르면
+  그 지점의 냄새 정도를 알려줍니다.</p>
   <p class="note"><b>주의:</b> 암나무 표기는 자치구 18곳 데이터에만 있습니다.
   성동·강북·은평·서대문·마포·강서·영등포·서초구는 구분 없이 "은행나무"로만 기록돼,
-  노란 점에도 암나무가 섞여 있을 수 있습니다.</p>
+  노란 표시에도 암나무가 섞여 있을 수 있습니다.</p>
   <details>
     <summary>왜 냄새가 나나요?</summary>
     <p>은행나무는 암수가 다른 나무이고 열매는 암나무에만 열립니다.
     가을에 열매 껍질이 터지면서 은행산·빌로볼 성분이 냄새를 냅니다.
     서울시는 매년 9월부터 암나무 열매를 조기 채취합니다.</p>
   </details>
+</div>
+
+<div id="smell-card">
+  <p class="grade"><span class="dot" id="smell-dot"></span><span id="smell-grade"></span></p>
+  <p class="where" id="smell-where"></p>
+  <p class="detail" id="smell-detail"></p>
+  <p class="season" id="smell-season"></p>
 </div>
 
 <div class="credit">
@@ -88,9 +113,10 @@ const map = new maplibregl.Map({
   maxBounds: [[126.5, 37.2], [127.5, 38.0]]
 });
 map.addControl(new maplibregl.NavigationControl(), 'top-right');
-map.addControl(new maplibregl.GeolocateControl({
+const geolocate = new maplibregl.GeolocateControl({
   positionOptions: { enableHighAccuracy: true }, trackUserLocation: true
-}), 'top-right');
+});
+map.addControl(geolocate, 'top-right');
 
 function toGeojson(coords) {
   return {
@@ -99,35 +125,122 @@ function toGeojson(coords) {
   };
 }
 
+/* ---------- 냄새 판정 ----------
+ * 격자 색인(약 110m 셀)으로 반경 내 나무를 빠르게 센다.
+ * 점수 = 암나무(거리 가중) + 미상 은행나무 × 0.24(서울시 발표 암나무 비율 근사)
+ */
+const CELL = 0.001; // 도(degree) — 위도 0.001° ≈ 111m
+const grid = { female: new Map(), unknown: new Map() };
+let treeData = null;
+
+function cellKey(lon, lat) { return Math.floor(lon / CELL) + ',' + Math.floor(lat / CELL); }
+function buildGrid(kind, coords) {
+  const g = grid[kind];
+  for (const c of coords) {
+    const k = cellKey(c[0], c[1]);
+    let arr = g.get(k);
+    if (!arr) { arr = []; g.set(k, arr); }
+    arr.push(c);
+  }
+}
+function metersBetween(lon1, lat1, lon2, lat2) {
+  const kx = 111320 * Math.cos(lat1 * Math.PI / 180), ky = 110574;
+  const dx = (lon2 - lon1) * kx, dy = (lat2 - lat1) * ky;
+  return Math.sqrt(dx * dx + dy * dy);
+}
+function nearby(kind, lon, lat, radius) {
+  const g = grid[kind], out = [];
+  const span = Math.ceil(radius / 100000 / CELL) + 1;
+  const cx = Math.floor(lon / CELL), cy = Math.floor(lat / CELL);
+  for (let i = cx - span; i <= cx + span; i++) {
+    for (let j = cy - span; j <= cy + span; j++) {
+      const arr = g.get(i + ',' + j);
+      if (!arr) continue;
+      for (const c of arr) {
+        const d = metersBetween(lon, lat, c[0], c[1]);
+        if (d <= radius) out.push(d);
+      }
+    }
+  }
+  return out;
+}
+function distWeight(d) { return d <= 50 ? 1 : d <= 100 ? 0.5 : 0.25; }
+
+function smellAt(lon, lat) {
+  const R = 150;
+  const f = nearby('female', lon, lat, R);
+  const u = nearby('unknown', lon, lat, R);
+  const score = f.reduce((s, d) => s + distWeight(d), 0)
+              + 0.24 * u.reduce((s, d) => s + distWeight(d), 0);
+  let grade, color;
+  if (score === 0)      { grade = '은행나무 없음';   color = '#3f9b57'; }
+  else if (score < 1)   { grade = '거의 안 남';      color = '#7cb342'; }
+  else if (score < 4)   { grade = '냄새 주의';       color = '#e6a700'; }
+  else if (score < 10)  { grade = '냄새 구간';       color = '#e2542c'; }
+  else                  { grade = '냄새 밀집 구간';  color = '#b3261e'; }
+  return { score, grade, color, female: f.length, unknown: u.length, radius: R };
+}
+
+const SEASON_MSG = (() => {
+  const m = new Date().getMonth() + 1;
+  if (m >= 9 && m <= 11) return '지금은 은행 열매 철(9~11월)입니다. 표시 구간을 지날 때 발밑을 조심하세요.';
+  return '은행 열매 냄새는 9~11월에 납니다. 지금은 철이 아니라 냄새가 없거나 약합니다.';
+})();
+
+let clickMarker = null;
+function showSmell(lon, lat, label) {
+  if (!treeData) return;
+  const r = smellAt(lon, lat);
+  document.getElementById('smell-dot').style.background = r.color;
+  document.getElementById('smell-grade').textContent = r.grade;
+  document.getElementById('smell-where').textContent = label;
+  document.getElementById('smell-detail').textContent =
+    `반경 ${r.radius}m 안 — 암나무 ${r.female}그루 · 암수 미표기 ${r.unknown}그루`;
+  document.getElementById('smell-season').textContent = SEASON_MSG;
+  document.getElementById('smell-card').classList.add('show');
+}
+
 map.on('load', async () => {
   const res = await fetch('data/ginkgo.json');
-  const data = await res.json();
-  document.getElementById('count-female').textContent = data.female.length.toLocaleString() + '그루';
-  document.getElementById('count-unknown').textContent = data.unknown.length.toLocaleString() + '그루';
+  treeData = await res.json();
+  document.getElementById('count-female').textContent = treeData.female.length.toLocaleString() + '그루';
+  document.getElementById('count-unknown').textContent = treeData.unknown.length.toLocaleString() + '그루';
+  buildGrid('female', treeData.female);
+  buildGrid('unknown', treeData.unknown);
 
-  map.addSource('female', { type: 'geojson', data: toGeojson(data.female) });
-  map.addSource('unknown', { type: 'geojson', data: toGeojson(data.unknown) });
+  map.addSource('female', { type: 'geojson', data: toGeojson(treeData.female) });
+  map.addSource('unknown', { type: 'geojson', data: toGeojson(treeData.unknown) });
 
-  // 줌 아웃: 열지도 (암나무만 — 냄새 위험의 실체)
+  // 줌 아웃: 미상(노랑) 열지도 → 그 위에 암나무(주황) 열지도
+  map.addLayer({
+    id: 'unknown-heat', type: 'heatmap', source: 'unknown', maxzoom: 15,
+    paint: {
+      'heatmap-radius': ['interpolate', ['linear'], ['zoom'], 10, 3, 14, 12],
+      'heatmap-intensity': ['interpolate', ['linear'], ['zoom'], 10, 0.16, 14, 0.7],
+      'heatmap-opacity': ['interpolate', ['linear'], ['zoom'], 13, 0.7, 15, 0],
+      'heatmap-color': ['interpolate', ['linear'], ['heatmap-density'],
+        0, 'rgba(216,168,0,0)', 0.2, 'rgba(240,210,110,.4)',
+        0.55, 'rgba(226,180,40,.6)', 1, 'rgba(200,150,0,.75)']
+    }
+  });
   map.addLayer({
     id: 'female-heat', type: 'heatmap', source: 'female', maxzoom: 15,
     paint: {
       'heatmap-radius': ['interpolate', ['linear'], ['zoom'], 10, 3.5, 14, 14],
-      'heatmap-intensity': ['interpolate', ['linear'], ['zoom'], 10, 0.22, 14, 0.9],
-      'heatmap-opacity': ['interpolate', ['linear'], ['zoom'], 13, 0.8, 15, 0],
+      'heatmap-intensity': ['interpolate', ['linear'], ['zoom'], 10, 0.25, 14, 0.95],
+      'heatmap-opacity': ['interpolate', ['linear'], ['zoom'], 13, 0.85, 15, 0],
       'heatmap-color': ['interpolate', ['linear'], ['heatmap-density'],
-        0, 'rgba(226,84,44,0)', 0.15, 'rgba(252,200,140,.35)',
-        0.45, 'rgba(244,140,70,.6)', 0.75, 'rgba(230,90,40,.8)', 1, 'rgba(190,40,15,.92)']
+        0, 'rgba(226,84,44,0)', 0.15, 'rgba(250,170,110,.45)',
+        0.45, 'rgba(240,120,60,.7)', 0.75, 'rgba(226,84,44,.85)', 1, 'rgba(185,40,15,.95)']
     }
   });
-  // 줌 인: 개별 나무
+  // 줌 인: 개별 나무 (테두리 없음)
   map.addLayer({
     id: 'unknown-dots', type: 'circle', source: 'unknown', minzoom: 12.5,
     paint: {
       'circle-radius': ['interpolate', ['linear'], ['zoom'], 13, 2, 17, 6],
       'circle-color': '#d8a800',
-      'circle-opacity': ['interpolate', ['linear'], ['zoom'], 12.5, 0, 13.5, 0.8],
-      'circle-stroke-width': 0.6, 'circle-stroke-color': '#fff'
+      'circle-opacity': ['interpolate', ['linear'], ['zoom'], 12.5, 0, 13.5, 0.8]
     }
   });
   map.addLayer({
@@ -135,8 +248,7 @@ map.on('load', async () => {
     paint: {
       'circle-radius': ['interpolate', ['linear'], ['zoom'], 13, 2.6, 17, 7.5],
       'circle-color': '#e2542c',
-      'circle-opacity': ['interpolate', ['linear'], ['zoom'], 12.5, 0, 13.5, 0.95],
-      'circle-stroke-width': 0.8, 'circle-stroke-color': '#fff'
+      'circle-opacity': ['interpolate', ['linear'], ['zoom'], 12.5, 0, 13.5, 0.95]
     }
   });
 
@@ -147,7 +259,22 @@ map.on('load', async () => {
     });
   };
   bind('toggle-female', ['female-heat', 'female-dots']);
-  bind('toggle-unknown', ['unknown-dots']);
+  bind('toggle-unknown', ['unknown-heat', 'unknown-dots']);
+
+  // 지도 탭 → 그 지점 냄새 판정
+  map.on('click', e => {
+    const { lng, lat } = e.lngLat;
+    if (clickMarker) clickMarker.remove();
+    clickMarker = new maplibregl.Marker({ color: '#1c2733', scale: 0.8 })
+      .setLngLat([lng, lat]).addTo(map);
+    showSmell(lng, lat, '선택한 지점 기준');
+  });
+
+  // 내 위치 추적 → 위치 갱신마다 냄새 판정
+  geolocate.on('geolocate', pos => {
+    if (clickMarker) { clickMarker.remove(); clickMarker = null; }
+    showSmell(pos.coords.longitude, pos.coords.latitude, '내 위치 기준 (이동하면 자동 갱신)');
+  });
 });
 </script>
 </body>
