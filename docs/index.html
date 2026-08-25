@@ -64,20 +64,20 @@
 <div class="panel">
   <h1>골목대장 <small>은행나무 편</small></h1>
   <p class="tagline">가을 은행 냄새, 밟기 전에 미리 보기.<br>서울 가로수 은행나무 99,394그루의 위치입니다.</p>
-  <label class="layer-row"><input type="checkbox" id="toggle-female" checked>
-    <span class="swatch female"></span> 암나무 (열매·냄새 발생) <span class="count" id="count-female"></span></label>
-  <label class="layer-row"><input type="checkbox" id="toggle-unknown" checked>
-    <span class="swatch unknown"></span> 은행나무 (암수 미표기) <span class="count" id="count-unknown"></span></label>
+  <label class="layer-row"><input type="checkbox" id="toggle-trees" checked>
+    <span class="swatch unknown"></span> 은행나무 <span class="count" id="count-trees"></span></label>
+  <label class="layer-row"><input type="checkbox" id="toggle-smell" checked>
+    <span class="swatch female"></span> 냄새 구간 <span class="count" id="count-smell"></span></label>
   <p class="hint">지도를 탭하거나 오른쪽 위 <b>⌖ 내 위치</b> 버튼을 누르면
   그 지점의 냄새 정도를 알려줍니다.</p>
-  <p class="note"><b>주의:</b> 암나무 표기는 자치구 18곳 데이터에만 있습니다.
-  성동·강북·은평·서대문·마포·강서·영등포·서초구는 구분 없이 "은행나무"로만 기록돼,
-  노란 표시에도 암나무가 섞여 있을 수 있습니다.</p>
   <details>
-    <summary>왜 냄새가 나나요?</summary>
-    <p>은행나무는 암수가 다른 나무이고 열매는 암나무에만 열립니다.
-    가을에 열매 껍질이 터지면서 은행산·빌로볼 성분이 냄새를 냅니다.
-    서울시는 매년 9월부터 암나무 열매를 조기 채취합니다.</p>
+    <summary>냄새 구간은 어떻게 정했나요?</summary>
+    <p>은행 냄새는 열매가 떨어져 터질 때 납니다. 열매는 은행나무 중에서도
+    암나무에만 열리는데, 서울시 데이터에 암나무로 기록된 16,634그루 주변을
+    빨간 냄새 구간으로 표시했습니다.</p>
+    <p>단, 자치구 8곳(성동·강북·은평·서대문·마포·강서·영등포·서초)은
+    암나무 기록이 없어서 그 지역은 냄새 구간이 비어 보일 수 있습니다.
+    노란 나무 중에도 열매 맺는 나무가 대략 4그루에 1그루꼴로 섞여 있습니다.</p>
   </details>
 </div>
 
@@ -195,7 +195,7 @@ function showSmell(lon, lat, label) {
   document.getElementById('smell-grade').textContent = r.grade;
   document.getElementById('smell-where').textContent = label;
   document.getElementById('smell-detail').textContent =
-    `반경 ${r.radius}m 안 — 암나무 ${r.female}그루 · 암수 미표기 ${r.unknown}그루`;
+    `반경 ${r.radius}m 안 은행나무 ${r.female + r.unknown}그루 · 그중 열매 맺는 나무(기록 기준) ${r.female}그루`;
   document.getElementById('smell-season').textContent = SEASON_MSG;
   document.getElementById('smell-card').classList.add('show');
 }
@@ -203,52 +203,46 @@ function showSmell(lon, lat, label) {
 map.on('load', async () => {
   const res = await fetch('data/ginkgo.json');
   treeData = await res.json();
-  document.getElementById('count-female').textContent = treeData.female.length.toLocaleString() + '그루';
-  document.getElementById('count-unknown').textContent = treeData.unknown.length.toLocaleString() + '그루';
+  const allTrees = treeData.female.concat(treeData.unknown);
+  document.getElementById('count-trees').textContent = allTrees.length.toLocaleString() + '그루';
   buildGrid('female', treeData.female);
   buildGrid('unknown', treeData.unknown);
 
-  map.addSource('female', { type: 'geojson', data: toGeojson(treeData.female) });
-  map.addSource('unknown', { type: 'geojson', data: toGeojson(treeData.unknown) });
+  map.addSource('trees', { type: 'geojson', data: toGeojson(allTrees) });
+  map.addSource('smell', { type: 'geojson', data: toGeojson(treeData.female) });
 
-  // 줌 아웃: 미상(노랑) 열지도 → 그 위에 암나무(주황) 열지도
+  // 줌 아웃: 은행나무 전체(노랑) 열지도
   map.addLayer({
-    id: 'unknown-heat', type: 'heatmap', source: 'unknown', maxzoom: 15,
+    id: 'trees-heat', type: 'heatmap', source: 'trees', maxzoom: 15,
     paint: {
       'heatmap-radius': ['interpolate', ['linear'], ['zoom'], 10, 3, 14, 12],
-      'heatmap-intensity': ['interpolate', ['linear'], ['zoom'], 10, 0.16, 14, 0.7],
+      'heatmap-intensity': ['interpolate', ['linear'], ['zoom'], 10, 0.14, 14, 0.6],
       'heatmap-opacity': ['interpolate', ['linear'], ['zoom'], 13, 0.7, 15, 0],
       'heatmap-color': ['interpolate', ['linear'], ['heatmap-density'],
         0, 'rgba(216,168,0,0)', 0.2, 'rgba(240,210,110,.4)',
         0.55, 'rgba(226,180,40,.6)', 1, 'rgba(200,150,0,.75)']
     }
   });
+  // 냄새 구간(빨강): 열매 맺는 나무 주변 — 줌 인해도 구역 표시 유지
   map.addLayer({
-    id: 'female-heat', type: 'heatmap', source: 'female', maxzoom: 15,
+    id: 'smell-heat', type: 'heatmap', source: 'smell',
     paint: {
-      'heatmap-radius': ['interpolate', ['linear'], ['zoom'], 10, 3.5, 14, 14],
-      'heatmap-intensity': ['interpolate', ['linear'], ['zoom'], 10, 0.25, 14, 0.95],
-      'heatmap-opacity': ['interpolate', ['linear'], ['zoom'], 13, 0.85, 15, 0],
+      'heatmap-radius': ['interpolate', ['exponential', 2], ['zoom'],
+        10, 3.5, 14, 16, 16, 55, 18, 200],
+      'heatmap-intensity': ['interpolate', ['linear'], ['zoom'], 10, 0.25, 14, 0.9, 18, 1.1],
+      'heatmap-opacity': 0.75,
       'heatmap-color': ['interpolate', ['linear'], ['heatmap-density'],
         0, 'rgba(226,84,44,0)', 0.15, 'rgba(250,170,110,.45)',
         0.45, 'rgba(240,120,60,.7)', 0.75, 'rgba(226,84,44,.85)', 1, 'rgba(185,40,15,.95)']
     }
   });
-  // 줌 인: 개별 나무 (테두리 없음)
+  // 줌 인: 개별 나무 (전부 같은 노란 점, 테두리 없음)
   map.addLayer({
-    id: 'unknown-dots', type: 'circle', source: 'unknown', minzoom: 12.5,
+    id: 'trees-dots', type: 'circle', source: 'trees', minzoom: 12.5,
     paint: {
       'circle-radius': ['interpolate', ['linear'], ['zoom'], 13, 2, 17, 6],
       'circle-color': '#d8a800',
-      'circle-opacity': ['interpolate', ['linear'], ['zoom'], 12.5, 0, 13.5, 0.8]
-    }
-  });
-  map.addLayer({
-    id: 'female-dots', type: 'circle', source: 'female', minzoom: 12.5,
-    paint: {
-      'circle-radius': ['interpolate', ['linear'], ['zoom'], 13, 2.6, 17, 7.5],
-      'circle-color': '#e2542c',
-      'circle-opacity': ['interpolate', ['linear'], ['zoom'], 12.5, 0, 13.5, 0.95]
+      'circle-opacity': ['interpolate', ['linear'], ['zoom'], 12.5, 0, 13.5, 0.85]
     }
   });
 
@@ -258,8 +252,8 @@ map.on('load', async () => {
       layerIds.forEach(id => map.setLayoutProperty(id, 'visibility', v));
     });
   };
-  bind('toggle-female', ['female-heat', 'female-dots']);
-  bind('toggle-unknown', ['unknown-heat', 'unknown-dots']);
+  bind('toggle-trees', ['trees-heat', 'trees-dots']);
+  bind('toggle-smell', ['smell-heat']);
 
   // 지도 탭 → 그 지점 냄새 판정
   map.on('click', e => {
