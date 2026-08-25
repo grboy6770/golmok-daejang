@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>골목대장 — 은행나무 지도</title>
+<meta name="description" content="가을 은행 냄새, 밟기 전에 미리 보는 서울 은행나무 지도. 열매 맺는 암나무 위치를 표시합니다.">
+<link href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet">
+<script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+<style>
+  :root {
+    --panel-bg: rgba(255, 255, 255, 0.94);
+    --ink: #1c2733;
+    --female: #e2542c;
+    --unknown: #d8a800;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; font-family: "Apple SD Gothic Neo", "Pretendard", "Noto Sans KR", sans-serif; color: var(--ink); }
+  #map { position: absolute; inset: 0; }
+  .panel {
+    position: absolute; top: 12px; left: 12px; z-index: 10;
+    background: var(--panel-bg); border-radius: 12px; padding: 14px 16px;
+    box-shadow: 0 2px 12px rgba(0,0,0,.18); max-width: 320px; backdrop-filter: blur(4px);
+  }
+  .panel h1 { margin: 0 0 2px; font-size: 20px; letter-spacing: -.02em; }
+  .panel h1 small { font-weight: 600; font-size: 13px; color: #5a6b7d; margin-left: 6px; }
+  .panel p.tagline { margin: 0 0 10px; font-size: 12.5px; color: #45566a; line-height: 1.5; }
+  .layer-row { display: flex; align-items: center; gap: 8px; font-size: 13.5px; padding: 4px 0; cursor: pointer; user-select: none; }
+  .swatch { width: 12px; height: 12px; border-radius: 50%; flex: 0 0 auto; }
+  .swatch.female { background: var(--female); }
+  .swatch.unknown { background: var(--unknown); }
+  .count { margin-left: auto; color: #5a6b7d; font-variant-numeric: tabular-nums; font-size: 12.5px; }
+  .note { margin: 10px 0 0; font-size: 11.5px; color: #6b7c8e; line-height: 1.55; border-top: 1px solid #e3e9ef; padding-top: 8px; }
+  .note b { color: #45566a; }
+  .credit { position: absolute; bottom: 4px; left: 8px; z-index: 10; font-size: 10.5px; color: #4c5a68; background: rgba(255,255,255,.8); padding: 2px 6px; border-radius: 6px; }
+  .credit a { color: inherit; }
+  details summary { cursor: pointer; font-size: 12px; color: #45566a; margin-top: 8px; }
+  details p { font-size: 11.5px; color: #6b7c8e; margin: 6px 0 0; line-height: 1.55; }
+  @media (max-width: 480px) {
+    .panel { max-width: calc(100vw - 24px); padding: 12px 14px; }
+    .panel h1 { font-size: 17px; }
+  }
+</style>
+</head>
+<body>
+<div id="map"></div>
+
+<div class="panel">
+  <h1>골목대장 <small>은행나무 편</small></h1>
+  <p class="tagline">가을 은행 냄새, 밟기 전에 미리 보기.<br>서울 가로수 은행나무 99,394그루의 위치입니다.</p>
+  <label class="layer-row"><input type="checkbox" id="toggle-female" checked>
+    <span class="swatch female"></span> 암나무 (열매·냄새 발생) <span class="count" id="count-female"></span></label>
+  <label class="layer-row"><input type="checkbox" id="toggle-unknown" checked>
+    <span class="swatch unknown"></span> 은행나무 (암수 미표기) <span class="count" id="count-unknown"></span></label>
+  <p class="note"><b>주의:</b> 암나무 표기는 자치구 18곳 데이터에만 있습니다.
+  성동·강북·은평·서대문·마포·강서·영등포·서초구는 구분 없이 "은행나무"로만 기록돼,
+  노란 점에도 암나무가 섞여 있을 수 있습니다.</p>
+  <details>
+    <summary>왜 냄새가 나나요?</summary>
+    <p>은행나무는 암수가 다른 나무이고 열매는 암나무에만 열립니다.
+    가을에 열매 껍질이 터지면서 은행산·빌로볼 성분이 냄새를 냅니다.
+    서울시는 매년 9월부터 암나무 열매를 조기 채취합니다.</p>
+  </details>
+</div>
+
+<div class="credit">
+  © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> 기여자
+  · 데이터: <a href="https://data.seoul.go.kr/dataList/OA-22904/S/1/datasetView.do" target="_blank" rel="noopener">서울 열린데이터광장</a> (2026-04-20 기준)
+</div>
+
+<script>
+const map = new maplibregl.Map({
+  container: 'map',
+  style: {
+    version: 8,
+    sources: {
+      osm: {
+        type: 'raster',
+        tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
+        tileSize: 256,
+        attribution: '© OpenStreetMap contributors'
+      }
+    },
+    layers: [{ id: 'osm', type: 'raster', source: 'osm' }]
+  },
+  center: [126.9784, 37.5665],
+  zoom: 11.2,
+  maxBounds: [[126.5, 37.2], [127.5, 38.0]]
+});
+map.addControl(new maplibregl.NavigationControl(), 'top-right');
+map.addControl(new maplibregl.GeolocateControl({
+  positionOptions: { enableHighAccuracy: true }, trackUserLocation: true
+}), 'top-right');
+
+function toGeojson(coords) {
+  return {
+    type: 'FeatureCollection',
+    features: coords.map(c => ({ type: 'Feature', geometry: { type: 'Point', coordinates: c }, properties: {} }))
+  };
+}
+
+map.on('load', async () => {
+  const res = await fetch('data/ginkgo.json');
+  const data = await res.json();
+  document.getElementById('count-female').textContent = data.female.length.toLocaleString() + '그루';
+  document.getElementById('count-unknown').textContent = data.unknown.length.toLocaleString() + '그루';
+
+  map.addSource('female', { type: 'geojson', data: toGeojson(data.female) });
+  map.addSource('unknown', { type: 'geojson', data: toGeojson(data.unknown) });
+
+  // 줌 아웃: 열지도 (암나무만 — 냄새 위험의 실체)
+  map.addLayer({
+    id: 'female-heat', type: 'heatmap', source: 'female', maxzoom: 15,
+    paint: {
+      'heatmap-radius': ['interpolate', ['linear'], ['zoom'], 10, 3.5, 14, 14],
+      'heatmap-intensity': ['interpolate', ['linear'], ['zoom'], 10, 0.22, 14, 0.9],
+      'heatmap-opacity': ['interpolate', ['linear'], ['zoom'], 13, 0.8, 15, 0],
+      'heatmap-color': ['interpolate', ['linear'], ['heatmap-density'],
+        0, 'rgba(226,84,44,0)', 0.15, 'rgba(252,200,140,.35)',
+        0.45, 'rgba(244,140,70,.6)', 0.75, 'rgba(230,90,40,.8)', 1, 'rgba(190,40,15,.92)']
+    }
+  });
+  // 줌 인: 개별 나무
+  map.addLayer({
+    id: 'unknown-dots', type: 'circle', source: 'unknown', minzoom: 12.5,
+    paint: {
+      'circle-radius': ['interpolate', ['linear'], ['zoom'], 13, 2, 17, 6],
+      'circle-color': '#d8a800',
+      'circle-opacity': ['interpolate', ['linear'], ['zoom'], 12.5, 0, 13.5, 0.8],
+      'circle-stroke-width': 0.6, 'circle-stroke-color': '#fff'
+    }
+  });
+  map.addLayer({
+    id: 'female-dots', type: 'circle', source: 'female', minzoom: 12.5,
+    paint: {
+      'circle-radius': ['interpolate', ['linear'], ['zoom'], 13, 2.6, 17, 7.5],
+      'circle-color': '#e2542c',
+      'circle-opacity': ['interpolate', ['linear'], ['zoom'], 12.5, 0, 13.5, 0.95],
+      'circle-stroke-width': 0.8, 'circle-stroke-color': '#fff'
+    }
+  });
+
+  const bind = (checkboxId, layerIds) => {
+    document.getElementById(checkboxId).addEventListener('change', e => {
+      const v = e.target.checked ? 'visible' : 'none';
+      layerIds.forEach(id => map.setLayoutProperty(id, 'visibility', v));
+    });
+  };
+  bind('toggle-female', ['female-heat', 'female-dots']);
+  bind('toggle-unknown', ['unknown-dots']);
+});
+</script>
+</body>
+</html>
