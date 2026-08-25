@@ -50,7 +50,13 @@
   #smell-card .detail { font-size: 12.5px; color: #45566a; margin: 0; line-height: 1.6; }
   #smell-card .season { font-size: 11.5px; color: #6b7c8e; margin: 6px 0 0; border-top: 1px solid #e3e9ef; padding-top: 6px; line-height: 1.5; }
   #smell-card .where { font-size: 11px; color: #8494a5; margin: 2px 0 6px; }
-  .hint { font-size: 11.5px; color: #6b7c8e; margin: 8px 0 0; border-top: 1px solid #e3e9ef; padding-top: 8px; line-height: 1.5; }
+  .hint { font-size: 11.5px; color: #6b7c8e; margin: 8px 0 0; padding-top: 6px; line-height: 1.5; }
+  #btn-locate {
+    display: block; width: 100%; margin: 10px 0 0; padding: 9px 0;
+    border: 0; border-radius: 9px; background: #2563eb; color: #fff;
+    font-size: 14px; font-weight: 700; cursor: pointer; font-family: inherit;
+  }
+  #btn-locate:active { background: #1d4fc4; }
   @media (max-width: 480px) {
     .panel { max-width: calc(100vw - 24px); padding: 12px 14px; }
     .panel h1 { font-size: 17px; }
@@ -68,8 +74,8 @@
     <span class="swatch unknown"></span> 은행나무 <span class="count" id="count-trees"></span></label>
   <label class="layer-row"><input type="checkbox" id="toggle-smell" checked>
     <span class="swatch female"></span> 냄새 구간 <span class="count" id="count-smell"></span></label>
-  <p class="hint">지도를 탭하거나 오른쪽 위 <b>⌖ 내 위치</b> 버튼을 누르면
-  그 지점의 냄새 정도를 알려줍니다.</p>
+  <button id="btn-locate">📍 내 위치로 이동</button>
+  <p class="hint">지도를 탭하면 그 지점의 냄새 정도를 알려줍니다.</p>
   <details>
     <summary>냄새 구간은 어떻게 정했나요?</summary>
     <p>은행 냄새는 열매가 떨어져 터질 때 납니다. 열매는 은행나무 중에서도
@@ -264,11 +270,22 @@ map.on('load', async () => {
     showSmell(lng, lat, '선택한 지점 기준');
   });
 
-  // 내 위치 추적 → 위치 갱신마다 냄새 판정
+  // 내 위치 추적 → 위치 갱신마다 냄새 판정 + 지도 이동(파란 점은 GeolocateControl이 표시)
   geolocate.on('geolocate', pos => {
     if (clickMarker) { clickMarker.remove(); clickMarker = null; }
     showSmell(pos.coords.longitude, pos.coords.latitude, '내 위치 기준 (이동하면 자동 갱신)');
   });
+  geolocate.on('error', () => {
+    const card = document.getElementById('smell-card');
+    document.getElementById('smell-dot').style.background = '#8494a5';
+    document.getElementById('smell-grade').textContent = '위치를 가져올 수 없음';
+    document.getElementById('smell-where').textContent = '';
+    document.getElementById('smell-detail').textContent =
+      '브라우저의 위치 권한이 꺼져 있거나 거부됐습니다. 주소창 옆 자물쇠(사이트 설정)에서 위치를 허용한 뒤 다시 눌러 주세요.';
+    document.getElementById('smell-season').textContent = '';
+    card.classList.add('show');
+  });
+  document.getElementById('btn-locate').addEventListener('click', () => geolocate.trigger());
 });
 </script>
 </body>
