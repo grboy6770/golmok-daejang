@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>골목대장 — 은행나무 지도</title>
-<meta name="description" content="가을 은행 냄새, 밟기 전에 미리 보는 서울 은행나무 지도. 열매 맺는 암나무 위치를 표시합니다.">
+<title>골목대장 — 서울 골목 생활 지도</title>
+<meta name="description" content="가을 은행 냄새 구간과 시간대별 골목 소음을 미리 보는 서울 생활 지도.">
 <link href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet">
 <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
 <style>
@@ -57,6 +57,18 @@
     font-size: 14px; font-weight: 700; cursor: pointer; font-family: inherit;
   }
   #btn-locate:active { background: #1d4fc4; }
+  .tabs { display: flex; gap: 6px; margin: 0 0 10px; }
+  .tabs button {
+    flex: 1; padding: 7px 0; border: 1px solid #d5dde5; border-radius: 9px;
+    background: #f2f5f8; color: #45566a; font-size: 13.5px; font-weight: 700;
+    cursor: pointer; font-family: inherit;
+  }
+  .tabs button.on { background: #1c2733; color: #fff; border-color: #1c2733; }
+  #hour-row { display: flex; align-items: center; gap: 8px; margin: 4px 0 2px; font-size: 13px; }
+  #hour-slider { flex: 1; }
+  #hour-label { font-variant-numeric: tabular-nums; font-weight: 700; min-width: 42px; text-align: right; }
+  .noise-legend { display: flex; gap: 0; margin: 8px 0 2px; border-radius: 6px; overflow: hidden; font-size: 10.5px; text-align: center; color: #fff; }
+  .noise-legend span { flex: 1; padding: 3px 0; }
   @media (max-width: 480px) {
     .panel { max-width: calc(100vw - 24px); padding: 12px 14px; }
     .panel h1 { font-size: 17px; }
@@ -68,23 +80,52 @@
 <div id="map"></div>
 
 <div class="panel">
-  <h1>골목대장 <small>은행나무 편</small></h1>
-  <p class="tagline">가을 은행 냄새, 밟기 전에 미리 보기.<br>서울 가로수 은행나무 99,394그루의 위치입니다.</p>
-  <label class="layer-row"><input type="checkbox" id="toggle-trees" checked>
-    <span class="swatch unknown"></span> 은행나무 <span class="count" id="count-trees"></span></label>
-  <label class="layer-row"><input type="checkbox" id="toggle-smell" checked>
-    <span class="swatch female"></span> 냄새 구간 <span class="count" id="count-smell"></span></label>
+  <h1>골목대장</h1>
+  <div class="tabs">
+    <button id="tab-trees" class="on">🌳 은행나무</button>
+    <button id="tab-noise">🔊 골목 소음</button>
+  </div>
+
+  <div id="mode-trees-ui">
+    <p class="tagline">가을 은행 냄새, 밟기 전에 미리 보기.<br>서울 가로수 은행나무 99,394그루의 위치입니다.</p>
+    <label class="layer-row"><input type="checkbox" id="toggle-trees" checked>
+      <span class="swatch unknown"></span> 은행나무 <span class="count" id="count-trees"></span></label>
+    <label class="layer-row"><input type="checkbox" id="toggle-smell" checked>
+      <span class="swatch female"></span> 냄새 구간 <span class="count" id="count-smell"></span></label>
+    <p class="hint">지도를 탭하면 그 지점의 냄새 정도를 알려줍니다.</p>
+    <details>
+      <summary>냄새 구간은 어떻게 정했나요?</summary>
+      <p>은행 냄새는 열매가 떨어져 터질 때 납니다. 열매는 은행나무 중에서도
+      암나무에만 열리는데, 서울시 데이터에 암나무로 기록된 16,634그루 주변을
+      빨간 냄새 구간으로 표시했습니다.</p>
+      <p>단, 자치구 8곳(성동·강북·은평·서대문·마포·강서·영등포·서초)은
+      암나무 기록이 없어서 그 지역은 냄새 구간이 비어 보일 수 있습니다.
+      노란 나무 중에도 열매 맺는 나무가 대략 4그루에 1그루꼴로 섞여 있습니다.</p>
+    </details>
+  </div>
+
+  <div id="mode-noise-ui" style="display:none">
+    <p class="tagline">서울 곳곳 도시 센서 <span id="count-noise"></span>가 잰
+    시간대별 평균 소음입니다. 조용한 동네·시끄러운 길 찾기.</p>
+    <div id="hour-row">
+      <input type="range" id="hour-slider" min="0" max="23" step="1">
+      <span id="hour-label"></span>
+    </div>
+    <div class="noise-legend">
+      <span style="background:#3f9b57">~45 조용</span><span style="background:#9aba3b">~55 보통</span><span style="background:#e6a700">~65 시끄러움</span><span style="background:#d43d24">65+</span>
+    </div>
+    <p class="hint">동그라미를 탭하면 그 센서의 상세를 보여줍니다. 단위는 dB.</p>
+    <details>
+      <summary>어떤 데이터인가요?</summary>
+      <p>서울시가 시내에 설치한 도시 센서(S-DoT)의 소음 측정값입니다.
+      최근 4주(<span id="noise-weeks"></span>) 측정을 시간대별로 평균 냈습니다.
+      센서가 없는 골목은 표시되지 않습니다.</p>
+      <p>참고: 낮 도로 소음 65dB를 넘으면 시끄러운 편입니다.
+      40dB대는 조용한 주택가 수준입니다.</p>
+    </details>
+  </div>
+
   <button id="btn-locate">📍 내 위치로 이동</button>
-  <p class="hint">지도를 탭하면 그 지점의 냄새 정도를 알려줍니다.</p>
-  <details>
-    <summary>냄새 구간은 어떻게 정했나요?</summary>
-    <p>은행 냄새는 열매가 떨어져 터질 때 납니다. 열매는 은행나무 중에서도
-    암나무에만 열리는데, 서울시 데이터에 암나무로 기록된 16,634그루 주변을
-    빨간 냄새 구간으로 표시했습니다.</p>
-    <p>단, 자치구 8곳(성동·강북·은평·서대문·마포·강서·영등포·서초)은
-    암나무 기록이 없어서 그 지역은 냄새 구간이 비어 보일 수 있습니다.
-    노란 나무 중에도 열매 맺는 나무가 대략 4그루에 1그루꼴로 섞여 있습니다.</p>
-  </details>
 </div>
 
 <div id="smell-card">
@@ -261,8 +302,95 @@ map.on('load', async () => {
   bind('toggle-trees', ['trees-heat', 'trees-dots']);
   bind('toggle-smell', ['smell-heat']);
 
-  // 지도 탭 → 그 지점 냄새 판정
+  /* ---------- 골목 소음 모드 ---------- */
+  const noiseRes = await fetch('data/noise.json');
+  const noiseData = await noiseRes.json();
+  document.getElementById('count-noise').textContent = noiseData.sensors.length.toLocaleString() + '개';
+  document.getElementById('noise-weeks').textContent =
+    noiseData.weeks.length + '주, ' + noiseData.weeks[0].replace('sdot_', '') + '~' + noiseData.weeks.at(-1).replace('sdot_', '');
+
+  map.addSource('noise', { type: 'geojson', data: {
+    type: 'FeatureCollection',
+    features: noiseData.sensors.map(s => ({
+      type: 'Feature', geometry: { type: 'Point', coordinates: [s.lon, s.lat] },
+      properties: { addr: s.addr, h: s.h }
+    }))
+  }});
+  const noiseColor = hour => ['case',
+    ['<', ['at', hour, ['get', 'h']], 0], 'rgba(150,158,166,.5)',
+    ['step', ['at', hour, ['get', 'h']],
+      '#3f9b57', 45, '#9aba3b', 55, '#e6a700', 65, '#d43d24']];
+  let curHour = new Date().getHours();
+  map.addLayer({
+    id: 'noise-dots', type: 'circle', source: 'noise',
+    layout: { visibility: 'none' },
+    paint: {
+      'circle-radius': ['interpolate', ['linear'], ['zoom'], 10, 4.5, 14, 9, 17, 16],
+      'circle-color': noiseColor(curHour),
+      'circle-opacity': 0.88
+    }
+  });
+
+  const slider = document.getElementById('hour-slider');
+  const hourLabel = document.getElementById('hour-label');
+  const setHour = h => {
+    curHour = h;
+    hourLabel.textContent = h + '시';
+    map.setPaintProperty('noise-dots', 'circle-color', noiseColor(h));
+  };
+  slider.value = curHour;
+  setHour(curHour);
+  slider.addEventListener('input', () => setHour(+slider.value));
+
+  let noisePopup = null;
+  map.on('click', 'noise-dots', e => {
+    const f = e.features[0];
+    const h = typeof f.properties.h === 'string' ? JSON.parse(f.properties.h) : f.properties.h;
+    const now = h[curHour];
+    const known = h.map((v, i) => [v, i]).filter(x => x[0] >= 0);
+    known.sort((a, b) => a[0] - b[0]);
+    const [qv, qh] = known[0], [lv, lh] = known.at(-1);
+    if (noisePopup) noisePopup.remove();
+    noisePopup = new maplibregl.Popup({ closeButton: false, maxWidth: '260px' })
+      .setLngLat(e.lngLat)
+      .setHTML(`<div style="font-size:12.5px;line-height:1.6">
+        <b>${f.properties.addr || '위치 정보 없음'}</b><br>
+        ${curHour}시 평균 <b>${now >= 0 ? now + ' dB' : '측정 없음'}</b><br>
+        가장 조용: ${qh}시 (${qv} dB) · 가장 시끄러움: ${lh}시 (${lv} dB)</div>`)
+      .addTo(map);
+    e.preventDefault();
+  });
+  map.on('mouseenter', 'noise-dots', () => { map.getCanvas().style.cursor = 'pointer'; });
+  map.on('mouseleave', 'noise-dots', () => { map.getCanvas().style.cursor = ''; });
+
+  /* ---------- 모드 전환 ---------- */
+  let mode = 'trees';
+  const treesLayers = ['trees-heat', 'smell-heat', 'trees-dots'];
+  const setMode = m => {
+    mode = m;
+    document.getElementById('mode-trees-ui').style.display = m === 'trees' ? '' : 'none';
+    document.getElementById('mode-noise-ui').style.display = m === 'noise' ? '' : 'none';
+    document.getElementById('tab-trees').classList.toggle('on', m === 'trees');
+    document.getElementById('tab-noise').classList.toggle('on', m === 'noise');
+    if (m === 'trees') {
+      map.setLayoutProperty('trees-heat', 'visibility', document.getElementById('toggle-trees').checked ? 'visible' : 'none');
+      map.setLayoutProperty('trees-dots', 'visibility', document.getElementById('toggle-trees').checked ? 'visible' : 'none');
+      map.setLayoutProperty('smell-heat', 'visibility', document.getElementById('toggle-smell').checked ? 'visible' : 'none');
+      map.setLayoutProperty('noise-dots', 'visibility', 'none');
+      if (noisePopup) { noisePopup.remove(); noisePopup = null; }
+    } else {
+      treesLayers.forEach(id => map.setLayoutProperty(id, 'visibility', 'none'));
+      map.setLayoutProperty('noise-dots', 'visibility', 'visible');
+      document.getElementById('smell-card').classList.remove('show');
+      if (clickMarker) { clickMarker.remove(); clickMarker = null; }
+    }
+  };
+  document.getElementById('tab-trees').addEventListener('click', () => setMode('trees'));
+  document.getElementById('tab-noise').addEventListener('click', () => setMode('noise'));
+
+  // 지도 탭 → (은행나무 모드에서만) 그 지점 냄새 판정
   map.on('click', e => {
+    if (mode !== 'trees' || e.defaultPrevented) return;
     const { lng, lat } = e.lngLat;
     if (clickMarker) clickMarker.remove();
     clickMarker = new maplibregl.Marker({ color: '#1c2733', scale: 0.8 })
@@ -272,6 +400,7 @@ map.on('load', async () => {
 
   // 내 위치 추적 → 위치 갱신마다 냄새 판정 + 지도 이동(파란 점은 GeolocateControl이 표시)
   geolocate.on('geolocate', pos => {
+    if (mode !== 'trees') return;
     if (clickMarker) { clickMarker.remove(); clickMarker = null; }
     showSmell(pos.coords.longitude, pos.coords.latitude, '내 위치 기준 (이동하면 자동 갱신)');
   });
