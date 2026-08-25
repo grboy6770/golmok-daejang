@@ -1,0 +1,33 @@
+name: 소음 데이터 주간 갱신
+
+on:
+  schedule:
+    # 매주 화요일 03:30 UTC = 12:30 KST (서울시가 월요일에 전주 파일을 올린다)
+    - cron: "30 3 * * 2"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install openpyxl
+      - name: 최신 주간 데이터 수집·집계
+        run: python3 scripts/update_noise.py
+      - name: 변경 시 커밋
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/data/noise.json
+          if git diff --cached --quiet; then
+            echo "변경 없음"
+          else
+            git commit -m "chore: 소음 데이터 주간 갱신 ($(date -u +%Y-%m-%d))"
+            git push
+          fi
