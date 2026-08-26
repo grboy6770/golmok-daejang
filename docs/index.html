@@ -43,7 +43,17 @@
   .panel h1 {
     margin: 0 0 10px; font-family: "Jua", sans-serif; font-weight: 400;
     font-size: 27px; letter-spacing: .01em; display: flex; align-items: center; gap: 7px;
+    cursor: pointer; user-select: none;
   }
+  #panel-toggle {
+    margin-left: 6px; width: 30px; height: 30px; flex: 0 0 auto;
+    border: 1.5px solid var(--ink); border-radius: 999px; background: var(--paper);
+    color: var(--ink); font-size: 14px; cursor: pointer; line-height: 1;
+    transition: transform .15s ease;
+  }
+  .panel.collapsed #panel-body { display: none; }
+  .panel.collapsed h1 { margin-bottom: 0; }
+  .panel.collapsed #panel-toggle { transform: rotate(180deg); }
   .panel h1 svg { flex: 0 0 auto; }
   .panel h1 .sub { font-family: "Gowun Dodum"; font-size: 11.5px; color: var(--ink-soft); margin-left: auto; text-align: right; line-height: 1.35; }
   .panel p.tagline { margin: 0 0 10px; font-size: 12.5px; color: #4a443b; line-height: 1.6; }
@@ -132,11 +142,13 @@
 <div id="map"></div>
 
 <div class="panel">
-  <h1>
+  <h1 id="panel-head">
     <img src="assets/favicon-64.png" width="27" height="27" alt="" style="border-radius:7px;border:1.5px solid var(--ink)">
     골목대장
     <span class="sub">서울 골목<br>생활 지도</span>
+    <button id="panel-toggle" aria-label="패널 접기/펴기">▾</button>
   </h1>
+  <div id="panel-body">
   <div class="tabs">
     <button id="tab-trees" class="on">은행나무</button>
     <button id="tab-noise">소음</button>
@@ -199,6 +211,7 @@
   </div>
 
   <button id="btn-locate">내 위치로 이동</button>
+  </div><!-- /panel-body -->
 </div>
 
 <div id="smell-card">
@@ -225,6 +238,11 @@ const geolocate = new maplibregl.GeolocateControl({
   positionOptions: { enableHighAccuracy: true }, trackUserLocation: true
 });
 map.addControl(geolocate, 'top-right');
+
+// 패널 접기/펴기 — 좁은 화면(폰)에서는 접힌 상태로 시작해 지도를 가리지 않는다
+const panelEl = document.querySelector('.panel');
+document.getElementById('panel-head').addEventListener('click', () => panelEl.classList.toggle('collapsed'));
+if (window.matchMedia('(max-width: 480px)').matches) panelEl.classList.add('collapsed');
 
 function toGeojson(coords) {
   return {
