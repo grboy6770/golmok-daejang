@@ -10,6 +10,8 @@
 <meta property="og:url" content="https://grboy6770.github.io/golmok-daejang/">
 <link rel="icon" type="image/png" href="assets/favicon-64.png">
 <link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#faf5ea">
 <meta property="og:image" content="https://grboy6770.github.io/golmok-daejang/assets/mascot.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -90,6 +92,12 @@
   #btn-locate:active { transform: translate(2px, 2px); box-shadow: none; }
 
   #hour-row { display: flex; align-items: center; gap: 10px; margin: 4px 0 4px; font-size: 13px; }
+  #hour-play {
+    width: 30px; height: 30px; flex: 0 0 auto; border: 1.5px solid var(--ink);
+    border-radius: 999px; background: var(--paper); color: var(--ink);
+    font-size: 12px; cursor: pointer; line-height: 1;
+  }
+  #hour-play.on { background: var(--ink); color: var(--paper); }
   #hour-slider { flex: 1; accent-color: var(--ink); }
   #hour-label { font-family: "Jua", sans-serif; font-size: 16px; min-width: 44px; text-align: right; }
   .noise-legend {
@@ -179,6 +187,7 @@
     <p class="tagline">서울 곳곳 도시 센서 <span id="count-noise"></span>가 잰
     시간대별 평균 소음입니다. 조용한 동네·시끄러운 길 찾기.</p>
     <div id="hour-row">
+      <button id="hour-play" aria-label="시간 자동 재생">▶</button>
       <input type="range" id="hour-slider" min="0" max="23" step="1">
       <span id="hour-label"></span>
     </div>
@@ -444,7 +453,22 @@ map.on('load', async () => {
   };
   slider.value = curHour;
   setHour(curHour);
-  slider.addEventListener('input', () => setHour(+slider.value));
+  slider.addEventListener('input', () => { setHour(+slider.value); updateHash(); });
+
+  // 시간 자동 재생 (0시→23시 순환)
+  const playBtn = document.getElementById('hour-play');
+  let playTimer = null;
+  const stopPlay = () => { clearInterval(playTimer); playTimer = null; playBtn.textContent = '▶'; playBtn.classList.remove('on'); };
+  playBtn.addEventListener('click', () => {
+    if (playTimer) { stopPlay(); return; }
+    playBtn.textContent = '⏸'; playBtn.classList.add('on');
+    playTimer = setInterval(() => {
+      const next = (curHour + 1) % 24;
+      slider.value = next;
+      setHour(next);
+    }, 700);
+  });
+  slider.addEventListener('pointerdown', stopPlay);
 
   let noisePopup = null;
   map.on('click', 'noise-dots', e => {
@@ -566,9 +590,33 @@ map.on('load', async () => {
   };
   bind('toggle-bins', ['bins-dots']);
   bind('toggle-clothes', ['clothes-dots']);
-  document.getElementById('tab-trees').addEventListener('click', () => setMode('trees'));
-  document.getElementById('tab-noise').addEventListener('click', () => setMode('noise'));
-  document.getElementById('tab-bins').addEventListener('click', () => setMode('bins'));
+  document.getElementById('tab-trees').addEventListener('click', () => { setMode('trees'); updateHash(); });
+  document.getElementById('tab-noise').addEventListener('click', () => { setMode('noise'); updateHash(); });
+  document.getElementById('tab-bins').addEventListener('click', () => { setMode('bins'); updateHash(); });
+
+  /* ---------- 화면 상태 공유 (주소 해시) ----------
+   * #탭/줌/위도/경도[/시] — 링크를 받은 사람이 같은 화면을 본다 */
+  function updateHash() {
+    const c = map.getCenter();
+    let h = `#${mode}/${map.getZoom().toFixed(2)}/${c.lat.toFixed(5)}/${c.lng.toFixed(5)}`;
+    if (mode === 'noise') h += `/${curHour}`;
+    history.replaceState(null, '', h);
+  }
+  map.on('moveend', updateHash);
+  (function applyHash() {
+    const p = location.hash.slice(1).split('/');
+    if (p.length < 4) return;
+    const [m, z, lat, lng, hr] = p;
+    if (!['trees', 'noise', 'bins'].includes(m)) return;
+    const zf = +z, latf = +lat, lngf = +lng;
+    if (!isFinite(zf) || !isFinite(latf) || !isFinite(lngf)) return;
+    setMode(m);
+    map.jumpTo({ center: [lngf, latf], zoom: zf });
+    if (m === 'noise' && hr !== undefined && isFinite(+hr)) {
+      slider.value = +hr;
+      setHour(+hr);
+    }
+  })();
 
   // 지도 탭 → (은행나무 모드에서만) 그 지점 냄새 판정
   map.on('click', e => {

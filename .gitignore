@@ -3,3 +3,6 @@ __pycache__/
 .references/
 # S-DoT 주간 CSV는 개당 50MB+라 커밋하지 않는다 — scripts/fetch_sdot.sh 로 재수령
 data/raw/sdot_*.csv
+# API 수집 원본(용량) — fetch_trees.py 로 재수령
+data/raw/trees_api.json
+data/raw/trees_api/

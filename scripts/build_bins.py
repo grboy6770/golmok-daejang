@@ -51,29 +51,28 @@ def road_index_from_trees():
     반환: (road_index, jibun_index) — 각각 (구, 도로명|동명) -> [(번호, lon, lat)] 정렬 목록.
     번호는 본번*100+부번.
     """
-    wb = openpyxl.load_workbook(RAW / "trees_2026.xlsx", read_only=True)
+    from build_trees import iter_tree_rows
     road_acc = defaultdict(lambda: defaultdict(list))
     jibun_acc = defaultdict(lambda: defaultdict(list))
-    for sheet in wb.sheetnames:
-        for row in wb[sheet].iter_rows(min_row=4, values_only=True):
-            gu, _rte, _sp, road_addr, lot_addr, lon, lat = row[:7]
-            if lon is None or lat is None:
-                continue
-            try:
-                pt = (float(lon), float(lat))
-            except (TypeError, ValueError):
-                continue
-            gu = str(gu).strip()
-            if road_addr:
-                m = ADDR_RE.search(str(road_addr))
-                if m:
-                    num = int(m.group(2)) * 100 + int(m.group(3) or 0)
-                    road_acc[(gu, m.group(1))][num].append(pt)
-            if lot_addr:
-                m = JIBUN_RE.search(str(lot_addr))
-                if m:
-                    num = int(m.group(2)) * 100 + int(m.group(3) or 0)
-                    jibun_acc[(gu, m.group(1))][num].append(pt)
+    for row in iter_tree_rows():
+        gu, _rte, _sp, road_addr, lot_addr, lon, lat = row
+        if lon is None or lat is None:
+            continue
+        try:
+            pt = (float(lon), float(lat))
+        except (TypeError, ValueError):
+            continue
+        gu = str(gu).strip()
+        if road_addr:
+            m = ADDR_RE.search(str(road_addr))
+            if m:
+                num = int(m.group(2)) * 100 + int(m.group(3) or 0)
+                road_acc[(gu, m.group(1))][num].append(pt)
+        if lot_addr:
+            m = JIBUN_RE.search(str(lot_addr))
+            if m:
+                num = int(m.group(2)) * 100 + int(m.group(3) or 0)
+                jibun_acc[(gu, m.group(1))][num].append(pt)
     return _finalize(road_acc), _finalize(jibun_acc)
 
 
