@@ -209,7 +209,7 @@
 <script>
 const map = new maplibregl.Map({
   container: 'map',
-  style: 'https://tiles.openfreemap.org/styles/positron',
+  style: 'https://tiles.openfreemap.org/styles/liberty',
   center: [126.9784, 37.5665],
   zoom: 11.2,
   maxBounds: [[126.5, 37.2], [127.5, 38.0]]
@@ -303,6 +303,29 @@ function showSmell(lon, lat, label) {
 }
 
 map.on('load', async () => {
+  // 데이터 레이어를 지명·도로명 라벨 아래에 끼워 넣어 라벨이 항상 읽히게 한다
+  const labelLayerId = map.getStyle().layers.find(l => l.type === 'symbol')?.id;
+  const addLayer = def => map.addLayer(def, labelLayerId);
+  // 배경 도로의 주황·노랑이 은행나무 표시와 겹치므로 도로 계열 선 색을 회백색으로 통일
+  for (const l of map.getStyle().layers) {
+    if (l.type === 'line' && /highway|bridge|tunnel|road|rail/.test(l.id)) {
+      try { map.setPaintProperty(l.id, 'line-color', '#ddd6c8'); } catch (_) {}
+    }
+  }
+  // 건물(입체 포함)은 짙은 회색이라 밝은 회백색으로
+  for (const l of map.getStyle().layers) {
+    try {
+      if (l.type === 'fill-extrusion') {
+        map.setPaintProperty(l.id, 'fill-extrusion-color', '#ded9cd');
+        map.setPaintProperty(l.id, 'fill-extrusion-opacity', 0.45);
+      }
+      else if (l.type === 'fill' && /building/.test(l.id)) map.setPaintProperty(l.id, 'fill-color', '#e4dfd3');
+    } catch (_) {}
+  }
+  // 배경과 라벨 사이 얇은 종이색 막 — 전체 색을 한 톤 가라앉힘
+  addLayer({ id: 'base-dim', type: 'background',
+    paint: { 'background-color': '#faf5ea', 'background-opacity': 0.3 } });
+
   const res = await fetch('data/ginkgo.json');
   treeData = await res.json();
   const allTrees = treeData.female.concat(treeData.unknown);
@@ -314,7 +337,7 @@ map.on('load', async () => {
   map.addSource('smell', { type: 'geojson', data: toGeojson(treeData.female) });
 
   // 줌 아웃: 은행나무 전체(노랑) 열지도
-  map.addLayer({
+  addLayer({
     id: 'trees-heat', type: 'heatmap', source: 'trees', maxzoom: 15,
     paint: {
       'heatmap-radius': ['interpolate', ['linear'], ['zoom'], 10, 3, 14, 12],
@@ -326,7 +349,7 @@ map.on('load', async () => {
     }
   });
   // 냄새 구간(빨강): 열매 맺는 나무 주변 — 줌 인해도 구역 표시 유지
-  map.addLayer({
+  addLayer({
     id: 'smell-heat', type: 'heatmap', source: 'smell',
     paint: {
       'heatmap-radius': ['interpolate', ['exponential', 2], ['zoom'],
@@ -339,7 +362,7 @@ map.on('load', async () => {
     }
   });
   // 줌 인: 개별 나무 (전부 같은 노란 점, 테두리 없음)
-  map.addLayer({
+  addLayer({
     id: 'trees-dots', type: 'circle', source: 'trees', minzoom: 12.5,
     paint: {
       'circle-radius': ['interpolate', ['linear'], ['zoom'], 13, 2, 17, 6],
@@ -376,7 +399,7 @@ map.on('load', async () => {
     ['step', ['at', hour, ['get', 'h']],
       '#3f9b57', 45, '#9aba3b', 55, '#cf9a06', 65, '#c23a1c']];
   let curHour = new Date().getHours();
-  map.addLayer({
+  addLayer({
     id: 'noise-dots', type: 'circle', source: 'noise',
     layout: { visibility: 'none' },
     paint: {
@@ -429,7 +452,7 @@ map.on('load', async () => {
       properties: { gu: b.gu, addr: b.addr, d: b.d, k: b.k }
     }))
   }});
-  map.addLayer({
+  addLayer({
     id: 'bins-dots', type: 'circle', source: 'bins',
     layout: { visibility: 'none' },
     paint: {
