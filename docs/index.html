@@ -181,14 +181,18 @@
   </div>
 
   <div id="mode-bins-ui" style="display:none">
-    <p class="tagline">서울 길거리 쓰레기통 <span id="count-bins"></span>의 위치입니다.
-    담배꽁초·음료컵, 버릴 곳 찾기.</p>
-    <p class="hint">파란 점을 탭하면 위치 설명과 버릴 수 있는 종류를 보여줍니다.</p>
+    <p class="tagline">버릴 곳 찾기 — 길거리 쓰레기통과 의류수거함의 위치입니다.</p>
+    <label class="layer-row"><input type="checkbox" id="toggle-bins" checked>
+      <span class="swatch" style="background:#33658a"></span> 쓰레기통 <span class="count" id="count-bins"></span></label>
+    <label class="layer-row"><input type="checkbox" id="toggle-clothes" checked>
+      <span class="swatch" style="background:#7d5a94"></span> 의류수거함 <span class="count" id="count-clothes"></span></label>
+    <p class="hint">점을 탭하면 위치 설명을 보여줍니다.</p>
     <details>
       <summary>위치가 정확한가요?</summary>
-      <p>서울시 자료(2025년 11월 기준)에는 쓰레기통의 주소만 있고 좌표가 없습니다.
-      주소를 좌표로 바꿔서 찍었기 때문에 실제 위치와 수십 미터 차이가
-      날 수 있습니다. 주소를 좌표로 못 바꾼 일부는 표시되지 않습니다.</p>
+      <p>쓰레기통 자료(2025년 11월)에는 주소만 있어 주소를 좌표로 바꿔 찍었습니다.
+      실제 위치와 수십 미터 차이가 날 수 있고, 좌표를 못 구한 일부는 표시되지 않습니다.</p>
+      <p>의류수거함은 자치구 19곳 자료를 모았습니다.
+      도봉·노원·은평·마포·서초·중구는 공공데이터가 없어 표시되지 않습니다.</p>
     </details>
   </div>
 
@@ -476,6 +480,39 @@ map.on('load', async () => {
   map.on('mouseenter', 'bins-dots', () => { map.getCanvas().style.cursor = 'pointer'; });
   map.on('mouseleave', 'bins-dots', () => { map.getCanvas().style.cursor = ''; });
 
+  /* ---------- 의류수거함 ---------- */
+  const clothesRes = await fetch('data/clothes.json');
+  const clothesData = await clothesRes.json();
+  document.getElementById('count-clothes').textContent = clothesData.matched.toLocaleString() + '개';
+  map.addSource('clothes', { type: 'geojson', data: {
+    type: 'FeatureCollection',
+    features: clothesData.boxes.map(b => ({
+      type: 'Feature', geometry: { type: 'Point', coordinates: [b.lon, b.lat] },
+      properties: { gu: b.gu, addr: b.addr, d: b.d }
+    }))
+  }});
+  addLayer({
+    id: 'clothes-dots', type: 'circle', source: 'clothes',
+    layout: { visibility: 'none' },
+    paint: {
+      'circle-radius': ['interpolate', ['linear'], ['zoom'], 10, 2.5, 14, 6, 17, 12],
+      'circle-color': '#7d5a94',
+      'circle-opacity': 0.88
+    }
+  });
+  map.on('click', 'clothes-dots', e => {
+    const p = e.features[0].properties;
+    if (binsPopup) binsPopup.remove();
+    binsPopup = new maplibregl.Popup({ closeButton: false, maxWidth: '260px' })
+      .setLngLat(e.lngLat)
+      .setHTML(`<div style="font-size:12.5px;line-height:1.6">
+        <b>의류수거함</b><br>${p.gu} ${p.d ? p.d + ' · ' : ''}${p.addr}</div>`)
+      .addTo(map);
+    e.preventDefault();
+  });
+  map.on('mouseenter', 'clothes-dots', () => { map.getCanvas().style.cursor = 'pointer'; });
+  map.on('mouseleave', 'clothes-dots', () => { map.getCanvas().style.cursor = ''; });
+
   /* ---------- 모드 전환 ---------- */
   let mode = 'trees';
   const treesLayers = ['trees-heat', 'smell-heat', 'trees-dots'];
@@ -486,21 +523,27 @@ map.on('load', async () => {
       document.getElementById('tab-' + name).classList.toggle('on', m === name);
     }
     treesLayers.forEach(id => map.setLayoutProperty(id, 'visibility', 'none'));
-    map.setLayoutProperty('noise-dots', 'visibility', 'none');
-    map.setLayoutProperty('bins-dots', 'visibility', 'none');
+    ['noise-dots', 'bins-dots', 'clothes-dots'].forEach(id => map.setLayoutProperty(id, 'visibility', 'none'));
     if (noisePopup) { noisePopup.remove(); noisePopup = null; }
     if (binsPopup) { binsPopup.remove(); binsPopup = null; }
+    const checked = id => document.getElementById(id).checked ? 'visible' : 'none';
     if (m === 'trees') {
-      const t = document.getElementById('toggle-trees').checked ? 'visible' : 'none';
-      map.setLayoutProperty('trees-heat', 'visibility', t);
-      map.setLayoutProperty('trees-dots', 'visibility', t);
-      map.setLayoutProperty('smell-heat', 'visibility', document.getElementById('toggle-smell').checked ? 'visible' : 'none');
+      map.setLayoutProperty('trees-heat', 'visibility', checked('toggle-trees'));
+      map.setLayoutProperty('trees-dots', 'visibility', checked('toggle-trees'));
+      map.setLayoutProperty('smell-heat', 'visibility', checked('toggle-smell'));
     } else {
       document.getElementById('smell-card').classList.remove('show');
       if (clickMarker) { clickMarker.remove(); clickMarker = null; }
-      map.setLayoutProperty(m === 'noise' ? 'noise-dots' : 'bins-dots', 'visibility', 'visible');
+      if (m === 'noise') {
+        map.setLayoutProperty('noise-dots', 'visibility', 'visible');
+      } else {
+        map.setLayoutProperty('bins-dots', 'visibility', checked('toggle-bins'));
+        map.setLayoutProperty('clothes-dots', 'visibility', checked('toggle-clothes'));
+      }
     }
   };
+  bind('toggle-bins', ['bins-dots']);
+  bind('toggle-clothes', ['clothes-dots']);
   document.getElementById('tab-trees').addEventListener('click', () => setMode('trees'));
   document.getElementById('tab-noise').addEventListener('click', () => setMode('noise'));
   document.getElementById('tab-bins').addEventListener('click', () => setMode('bins'));
