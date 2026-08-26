@@ -47,6 +47,8 @@ def col(header, keys):
 def main() -> None:
     indexes = None  # 필요할 때만 가로수 색인 로드 (수 초 소요)
     geocache = json.loads(CACHE.read_text(encoding="utf-8")) if CACHE.exists() else {}
+    addr_path = ROOT / "data/cache/addr_coords.json"
+    addrcache = json.loads(addr_path.read_text(encoding="utf-8")) if addr_path.exists() else {}
     boxes = []
     unmatched = 0
     per_gu = {}
@@ -81,8 +83,9 @@ def main() -> None:
                         if res:
                             break
                 if res is None:
-                    g = geocache.get(f"{gu} {addr or jibun}")
-                    res = (g[0], g[1], "osm") if g else None
+                    key = f"{gu} {addr or jibun}"
+                    g = geocache.get(key) or addrcache.get(key)
+                    res = (g[0], g[1], "cache") if g else None
                 if res is None:
                     unmatched += 1
                     continue

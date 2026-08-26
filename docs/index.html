@@ -166,7 +166,7 @@
   </div>
 
   <div id="mode-trees-ui">
-    <p class="tagline">가을 은행 냄새, 밟기 전에 미리 보기.<br>서울 가로수 은행나무 99,394그루의 위치입니다.</p>
+    <p class="tagline">가을 은행 냄새, 밟기 전에 미리 보기.<br>서울 가로수 은행나무 <span id="tagline-trees"></span>그루의 위치입니다.</p>
     <label class="layer-row"><input type="checkbox" id="toggle-trees" checked>
       <span class="swatch unknown"></span> 은행나무 <span class="count" id="count-trees"></span></label>
     <label class="layer-row"><input type="checkbox" id="toggle-smell" checked>
@@ -175,7 +175,7 @@
     <details>
       <summary>냄새 구간은 어떻게 정했나요?</summary>
       <p>은행 냄새는 열매가 떨어져 터질 때 납니다. 열매는 은행나무 중에서도
-      암나무에만 열리는데, 서울시 데이터에 암나무로 기록된 16,634그루 주변을
+      암나무에만 열리는데, 서울시 데이터에 암나무로 기록된 <span id="detail-female"></span>그루 주변을
       빨간 냄새 구간으로 표시했습니다.</p>
       <p>단, 자치구 8곳(성동·강북·은평·서대문·마포·강서·영등포·서초)은
       암나무 기록이 없어서 그 지역은 냄새 구간이 비어 보일 수 있습니다.
@@ -255,6 +255,7 @@ const panelEl = document.querySelector('.panel');
 document.getElementById('panel-head').addEventListener('click', () => panelEl.classList.toggle('collapsed'));
 if (window.matchMedia('(max-width: 480px)').matches) panelEl.classList.add('collapsed');
 
+const DATA_V = '20260826a'; // 데이터 갱신 시 함께 올려 브라우저 캐시를 우회
 function toGeojson(coords) {
   return {
     type: 'FeatureCollection',
@@ -361,10 +362,12 @@ map.on('load', async () => {
   addLayer({ id: 'base-dim', type: 'background',
     paint: { 'background-color': '#faf5ea', 'background-opacity': 0.3 } });
 
-  const res = await fetch('data/ginkgo.json');
+  const res = await fetch('data/ginkgo.json?v=' + DATA_V);
   treeData = await res.json();
   const allTrees = treeData.female.concat(treeData.unknown);
   document.getElementById('count-trees').textContent = allTrees.length.toLocaleString() + '그루';
+  document.getElementById('tagline-trees').textContent = allTrees.length.toLocaleString();
+  document.getElementById('detail-female').textContent = treeData.female.length.toLocaleString();
   buildGrid('female', treeData.female);
   buildGrid('unknown', treeData.unknown);
 
@@ -416,7 +419,7 @@ map.on('load', async () => {
   bind('toggle-smell', ['smell-heat']);
 
   /* ---------- 골목 소음 모드 ---------- */
-  const noiseRes = await fetch('data/noise.json');
+  const noiseRes = await fetch('data/noise.json?v=' + DATA_V);
   const noiseData = await noiseRes.json();
   document.getElementById('count-noise').textContent = noiseData.sensors.length.toLocaleString() + '개';
   document.getElementById('noise-weeks').textContent =
@@ -492,7 +495,7 @@ map.on('load', async () => {
   map.on('mouseleave', 'noise-dots', () => { map.getCanvas().style.cursor = ''; });
 
   /* ---------- 쓰레기통 모드 ---------- */
-  const binsRes = await fetch('data/bins.json');
+  const binsRes = await fetch('data/bins.json?v=' + DATA_V);
   const binsData = await binsRes.json();
   document.getElementById('count-bins').textContent = binsData.matched.toLocaleString() + '개';
   map.addSource('bins', { type: 'geojson', data: {
@@ -527,7 +530,7 @@ map.on('load', async () => {
   map.on('mouseleave', 'bins-dots', () => { map.getCanvas().style.cursor = ''; });
 
   /* ---------- 의류수거함 ---------- */
-  const clothesRes = await fetch('data/clothes.json');
+  const clothesRes = await fetch('data/clothes.json?v=' + DATA_V);
   const clothesData = await clothesRes.json();
   document.getElementById('count-clothes').textContent = clothesData.matched.toLocaleString() + '개';
   map.addSource('clothes', { type: 'geojson', data: {

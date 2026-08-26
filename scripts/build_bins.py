@@ -123,6 +123,9 @@ def main() -> None:
     index = road_index_from_trees()
     cache_path = ROOT / "data/cache/nominatim_bins.json"
     geocache = json.loads(cache_path.read_text(encoding="utf-8")) if cache_path.exists() else {}
+    # 과거 빌드에서 확정된 좌표 (원천 데이터 갱신으로 색인 적중이 줄어도 후퇴하지 않도록)
+    addr_path = ROOT / "data/cache/addr_coords.json"
+    addrcache = json.loads(addr_path.read_text(encoding="utf-8")) if addr_path.exists() else {}
     wb = openpyxl.load_workbook(RAW / "bins_202511.xlsx", read_only=True)
     ws = wb[wb.sheetnames[0]]
     bins, unmatched = [], []
@@ -134,8 +137,8 @@ def main() -> None:
         gu, addr = str(gu).strip(), str(addr).strip()
         r = locate(index, gu, addr)
         if r is None:
-            g = geocache.get(f"{gu} {addr}")
-            r = (g[0], g[1], "osm") if g else None
+            g = geocache.get(f"{gu} {addr}") or addrcache.get(f"{gu} {addr}")
+            r = (g[0], g[1], "cache") if g else None
         if r is None:
             unmatched.append(f"{gu} {addr}")
             continue
