@@ -38,7 +38,9 @@
   .panel {
     position: absolute; top: 14px; left: 14px; z-index: 10;
     background: var(--paper); border: 1.5px solid var(--ink); border-radius: 10px;
-    padding: 14px 16px 16px; box-shadow: var(--shadow); max-width: 324px;
+    padding: 14px 16px 16px; box-shadow: var(--shadow);
+    /* 접힘/펼침 시에도 토글 버튼 위치가 고정되도록 폭을 고정 */
+    width: min(324px, calc(100vw - 28px));
   }
   .panel h1 {
     margin: 0 0 10px; font-family: "Jua", sans-serif; font-weight: 400;
