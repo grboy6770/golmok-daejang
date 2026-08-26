@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="docs/assets/logo.svg" width="88" alt="골목대장 로고">
+<img src="docs/assets/mascot.png" width="110" alt="골목대장 마스코트 — 골목 고양이">
 
 # 골목대장
 
