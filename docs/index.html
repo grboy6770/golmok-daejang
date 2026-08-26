@@ -4,75 +4,125 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>골목대장 — 서울 골목 생활 지도</title>
-<meta name="description" content="가을 은행 냄새 구간과 시간대별 골목 소음을 미리 보는 서울 생활 지도.">
+<meta name="description" content="가을 은행 냄새 구간, 시간대별 골목 소음, 길거리 쓰레기통. 서울 골목 사정을 미리 보는 지도.">
+<meta property="og:title" content="골목대장">
+<meta property="og:description" content="가을 은행 냄새 구간, 시간대별 골목 소음, 길거리 쓰레기통 — 서울 골목 사정을 미리 보는 지도">
+<meta property="og:url" content="https://grboy6770.github.io/golmok-daejang/">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%232b2926'/%3E%3Cpath d='M16 26v-7M16 19c-6 0-8.6-4.2-9-8.8 2.7 2.2 6 2.7 8.1 1.8.4-.2.7-.5.9-.9.2.4.5.7.9.9 2.1.9 5.4.4 8.1-1.8-.4 4.6-3 8.8-9 8.8z' stroke='%23e8b40c' stroke-width='2' fill='%23e8b40c' stroke-linejoin='round'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Jua&family=Gowun+Dodum&display=swap" rel="stylesheet">
 <link href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet">
 <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
 <style>
   :root {
-    --panel-bg: rgba(255, 255, 255, 0.94);
-    --ink: #1c2733;
-    --female: #e2542c;
-    --unknown: #d8a800;
+    --paper: #faf5ea;
+    --paper-dim: #f1e9d8;
+    --ink: #2b2926;
+    --ink-soft: #6b6459;
+    --line: #d8cfbc;
+    --ginkgo: #e8b40c;
+    --smell: #d0491f;
+    --shadow: 4px 4px 0 rgba(43, 41, 38, .22);
   }
   * { box-sizing: border-box; }
-  html, body { margin: 0; height: 100%; font-family: "Apple SD Gothic Neo", "Pretendard", "Noto Sans KR", sans-serif; color: var(--ink); }
-  #map { position: absolute; inset: 0; }
-  .panel {
-    position: absolute; top: 12px; left: 12px; z-index: 10;
-    background: var(--panel-bg); border-radius: 12px; padding: 14px 16px;
-    box-shadow: 0 2px 12px rgba(0,0,0,.18); max-width: 320px; backdrop-filter: blur(4px);
+  html, body {
+    margin: 0; height: 100%;
+    font-family: "Gowun Dodum", "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
+    color: var(--ink);
   }
-  .panel h1 { margin: 0 0 2px; font-size: 20px; letter-spacing: -.02em; }
-  .panel h1 small { font-weight: 600; font-size: 13px; color: #5a6b7d; margin-left: 6px; }
-  .panel p.tagline { margin: 0 0 10px; font-size: 12.5px; color: #45566a; line-height: 1.5; }
-  .layer-row { display: flex; align-items: center; gap: 8px; font-size: 13.5px; padding: 4px 0; cursor: pointer; user-select: none; }
-  .swatch { width: 12px; height: 12px; border-radius: 50%; flex: 0 0 auto; }
-  .swatch.female { background: var(--female); }
-  .swatch.unknown { background: var(--unknown); }
-  .count { margin-left: auto; color: #5a6b7d; font-variant-numeric: tabular-nums; font-size: 12.5px; }
-  .note { margin: 10px 0 0; font-size: 11.5px; color: #6b7c8e; line-height: 1.55; border-top: 1px solid #e3e9ef; padding-top: 8px; }
-  .note b { color: #45566a; }
-  .credit { position: absolute; bottom: 4px; left: 8px; z-index: 10; font-size: 10.5px; color: #4c5a68; background: rgba(255,255,255,.8); padding: 2px 6px; border-radius: 6px; }
-  .credit a { color: inherit; }
-  details summary { cursor: pointer; font-size: 12px; color: #45566a; margin-top: 8px; }
-  details p { font-size: 11.5px; color: #6b7c8e; margin: 6px 0 0; line-height: 1.55; }
+  #map { position: absolute; inset: 0; background: #eceae4; }
 
-  /* 냄새 체크 카드 */
+  .panel {
+    position: absolute; top: 14px; left: 14px; z-index: 10;
+    background: var(--paper); border: 1.5px solid var(--ink); border-radius: 10px;
+    padding: 14px 16px 16px; box-shadow: var(--shadow); max-width: 324px;
+  }
+  .panel h1 {
+    margin: 0 0 10px; font-family: "Jua", sans-serif; font-weight: 400;
+    font-size: 27px; letter-spacing: .01em; display: flex; align-items: center; gap: 7px;
+  }
+  .panel h1 svg { flex: 0 0 auto; }
+  .panel h1 .sub { font-family: "Gowun Dodum"; font-size: 11.5px; color: var(--ink-soft); margin-left: auto; text-align: right; line-height: 1.35; }
+  .panel p.tagline { margin: 0 0 10px; font-size: 12.5px; color: #4a443b; line-height: 1.6; }
+
+  .tabs { display: flex; gap: 6px; margin: 0 0 12px; }
+  .tabs button {
+    flex: 1; padding: 7px 0 6px; border: 1.5px solid var(--ink); border-radius: 999px;
+    background: var(--paper); color: var(--ink); font-size: 13.5px;
+    font-family: "Jua", sans-serif; font-weight: 400; letter-spacing: .02em;
+    cursor: pointer;
+  }
+  .tabs button.on { background: var(--ink); color: var(--paper); }
+
+  .layer-row { display: flex; align-items: center; gap: 8px; font-size: 13.5px; padding: 4px 0; cursor: pointer; user-select: none; }
+  .layer-row input { accent-color: var(--ink); }
+  .swatch { width: 12px; height: 12px; border-radius: 50%; flex: 0 0 auto; border: 1px solid rgba(43,41,38,.35); }
+  .swatch.female { background: var(--smell); }
+  .swatch.unknown { background: var(--ginkgo); }
+  .count { margin-left: auto; color: var(--ink-soft); font-variant-numeric: tabular-nums; font-size: 12.5px; }
+
+  .hint { font-size: 11.5px; color: var(--ink-soft); margin: 8px 0 0; padding-top: 6px; line-height: 1.55; }
+  details summary { cursor: pointer; font-size: 12px; color: var(--ink-soft); margin-top: 8px; }
+  details p { font-size: 11.5px; color: var(--ink-soft); margin: 6px 0 0; line-height: 1.6; }
+
+  #btn-locate {
+    display: block; width: 100%; margin: 12px 0 0; padding: 9px 0 8px;
+    border: 1.5px solid var(--ink); border-radius: 999px;
+    background: var(--ginkgo); color: var(--ink);
+    font-size: 15px; font-family: "Jua", sans-serif; cursor: pointer;
+    box-shadow: 2.5px 2.5px 0 rgba(43, 41, 38, .28);
+  }
+  #btn-locate:active { transform: translate(2px, 2px); box-shadow: none; }
+
+  #hour-row { display: flex; align-items: center; gap: 10px; margin: 4px 0 4px; font-size: 13px; }
+  #hour-slider { flex: 1; accent-color: var(--ink); }
+  #hour-label { font-family: "Jua", sans-serif; font-size: 16px; min-width: 44px; text-align: right; }
+  .noise-legend {
+    display: flex; margin: 8px 0 2px; border: 1.5px solid var(--ink); border-radius: 7px;
+    overflow: hidden; font-size: 10.5px; text-align: center; color: #fff;
+  }
+  .noise-legend span { flex: 1; padding: 3.5px 0; }
+
   #smell-card {
-    position: absolute; left: 12px; bottom: 28px; z-index: 10;
-    background: var(--panel-bg); border-radius: 12px; padding: 12px 16px;
-    box-shadow: 0 2px 12px rgba(0,0,0,.18); max-width: 320px; backdrop-filter: blur(4px);
+    position: absolute; left: 14px; bottom: 30px; z-index: 10;
+    background: var(--paper); border: 1.5px solid var(--ink); border-radius: 10px;
+    padding: 12px 16px; box-shadow: var(--shadow); max-width: 324px;
     display: none;
   }
   #smell-card.show { display: block; }
-  #smell-card .grade { font-size: 17px; font-weight: 700; margin: 0 0 4px; display: flex; align-items: center; gap: 7px; }
-  #smell-card .grade .dot { width: 13px; height: 13px; border-radius: 50%; }
-  #smell-card .detail { font-size: 12.5px; color: #45566a; margin: 0; line-height: 1.6; }
-  #smell-card .season { font-size: 11.5px; color: #6b7c8e; margin: 6px 0 0; border-top: 1px solid #e3e9ef; padding-top: 6px; line-height: 1.5; }
-  #smell-card .where { font-size: 11px; color: #8494a5; margin: 2px 0 6px; }
-  .hint { font-size: 11.5px; color: #6b7c8e; margin: 8px 0 0; padding-top: 6px; line-height: 1.5; }
-  #btn-locate {
-    display: block; width: 100%; margin: 10px 0 0; padding: 9px 0;
-    border: 0; border-radius: 9px; background: #2563eb; color: #fff;
-    font-size: 14px; font-weight: 700; cursor: pointer; font-family: inherit;
+  #smell-card .grade { font-family: "Jua", sans-serif; font-size: 19px; margin: 0 0 3px; display: flex; align-items: center; gap: 8px; }
+  #smell-card .grade .dot { width: 13px; height: 13px; border-radius: 50%; border: 1px solid rgba(43,41,38,.35); }
+  #smell-card .detail { font-size: 12.5px; color: #4a443b; margin: 0; line-height: 1.6; }
+  #smell-card .season { font-size: 11.5px; color: var(--ink-soft); margin: 7px 0 0; border-top: 1px dashed var(--line); padding-top: 7px; line-height: 1.55; }
+  #smell-card .where { font-size: 11px; color: #99917f; margin: 1px 0 6px; }
+
+  .credit {
+    position: absolute; bottom: 5px; left: 10px; z-index: 10;
+    font-size: 10.5px; color: var(--ink-soft);
+    background: rgba(250, 245, 234, .92); border: 1px solid var(--line);
+    padding: 2px 8px; border-radius: 999px;
   }
-  #btn-locate:active { background: #1d4fc4; }
-  .tabs { display: flex; gap: 6px; margin: 0 0 10px; }
-  .tabs button {
-    flex: 1; padding: 7px 0; border: 1px solid #d5dde5; border-radius: 9px;
-    background: #f2f5f8; color: #45566a; font-size: 13.5px; font-weight: 700;
-    cursor: pointer; font-family: inherit;
+  .credit a { color: inherit; }
+
+  /* 지도 팝업·컨트롤을 같은 결로 */
+  .maplibregl-popup-content {
+    background: var(--paper); border: 1.5px solid var(--ink); border-radius: 9px;
+    box-shadow: 3px 3px 0 rgba(43,41,38,.2); font-family: inherit; color: var(--ink);
+    padding: 10px 13px;
   }
-  .tabs button.on { background: #1c2733; color: #fff; border-color: #1c2733; }
-  #hour-row { display: flex; align-items: center; gap: 8px; margin: 4px 0 2px; font-size: 13px; }
-  #hour-slider { flex: 1; }
-  #hour-label { font-variant-numeric: tabular-nums; font-weight: 700; min-width: 42px; text-align: right; }
-  .noise-legend { display: flex; gap: 0; margin: 8px 0 2px; border-radius: 6px; overflow: hidden; font-size: 10.5px; text-align: center; color: #fff; }
-  .noise-legend span { flex: 1; padding: 3px 0; }
+  .maplibregl-popup-anchor-bottom .maplibregl-popup-tip { border-top-color: var(--ink); }
+  .maplibregl-popup-anchor-top .maplibregl-popup-tip { border-bottom-color: var(--ink); }
+  .maplibregl-popup-anchor-left .maplibregl-popup-tip { border-right-color: var(--ink); }
+  .maplibregl-popup-anchor-right .maplibregl-popup-tip { border-left-color: var(--ink); }
+  .maplibregl-ctrl-group { border: 1.5px solid var(--ink) !important; border-radius: 9px !important; box-shadow: 2.5px 2.5px 0 rgba(43,41,38,.22) !important; background: var(--paper) !important; }
+  .maplibregl-ctrl-group button { background: var(--paper) !important; }
+  .maplibregl-ctrl-group button + button { border-top: 1px solid var(--line) !important; }
+
   @media (max-width: 480px) {
-    .panel { max-width: calc(100vw - 24px); padding: 12px 14px; }
-    .panel h1 { font-size: 17px; }
-    #smell-card { max-width: calc(100vw - 24px); }
+    .panel { max-width: calc(100vw - 28px); padding: 12px 14px 14px; }
+    .panel h1 { font-size: 23px; }
+    #smell-card { max-width: calc(100vw - 28px); }
   }
 </style>
 </head>
@@ -80,11 +130,15 @@
 <div id="map"></div>
 
 <div class="panel">
-  <h1>골목대장</h1>
+  <h1>
+    <svg width="24" height="24" viewBox="0 0 32 32" aria-hidden="true"><path d="M16 27v-8M16 19c-6.5 0-9.3-4.6-9.7-9.6 2.9 2.4 6.5 2.9 8.8 1.9.4-.2.7-.5.9-.9.2.4.5.7.9.9 2.3 1 5.9.5 8.8-1.9-.4 5-3.2 9.6-9.7 9.6z" stroke="#c99700" stroke-width="2.2" fill="#e8b40c" stroke-linejoin="round" stroke-linecap="round"/></svg>
+    골목대장
+    <span class="sub">서울 골목<br>생활 지도</span>
+  </h1>
   <div class="tabs">
-    <button id="tab-trees" class="on">🌳 은행나무</button>
-    <button id="tab-noise">🔊 소음</button>
-    <button id="tab-bins">🗑️ 쓰레기통</button>
+    <button id="tab-trees" class="on">은행나무</button>
+    <button id="tab-noise">소음</button>
+    <button id="tab-bins">쓰레기통</button>
   </div>
 
   <div id="mode-trees-ui">
@@ -113,7 +167,7 @@
       <span id="hour-label"></span>
     </div>
     <div class="noise-legend">
-      <span style="background:#3f9b57">~45 조용</span><span style="background:#9aba3b">~55 보통</span><span style="background:#e6a700">~65 시끄러움</span><span style="background:#d43d24">65+</span>
+      <span style="background:#3f9b57">~45 조용</span><span style="background:#9aba3b">~55 보통</span><span style="background:#cf9a06">~65 시끄러움</span><span style="background:#c23a1c">65+</span>
     </div>
     <p class="hint">동그라미를 탭하면 그 센서의 상세를 보여줍니다. 단위는 dB.</p>
     <details>
@@ -138,7 +192,7 @@
     </details>
   </div>
 
-  <button id="btn-locate">📍 내 위치로 이동</button>
+  <button id="btn-locate">내 위치로 이동</button>
 </div>
 
 <div id="smell-card">
@@ -149,25 +203,13 @@
 </div>
 
 <div class="credit">
-  © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> 기여자
-  · 데이터: <a href="https://data.seoul.go.kr/dataList/OA-22904/S/1/datasetView.do" target="_blank" rel="noopener">서울 열린데이터광장</a> (2026-04-20 기준)
+  데이터: <a href="https://data.seoul.go.kr" target="_blank" rel="noopener">서울 열린데이터광장</a> (가로수 2026-04 · 소음 최근 4주 · 쓰레기통 2025-11)
 </div>
 
 <script>
 const map = new maplibregl.Map({
   container: 'map',
-  style: {
-    version: 8,
-    sources: {
-      osm: {
-        type: 'raster',
-        tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
-        tileSize: 256,
-        attribution: '© OpenStreetMap contributors'
-      }
-    },
-    layers: [{ id: 'osm', type: 'raster', source: 'osm' }]
-  },
+  style: 'https://tiles.openfreemap.org/styles/positron',
   center: [126.9784, 37.5665],
   zoom: 11.2,
   maxBounds: [[126.5, 37.2], [127.5, 38.0]]
@@ -235,9 +277,9 @@ function smellAt(lon, lat) {
   let grade, color;
   if (score === 0)      { grade = '은행나무 없음';   color = '#3f9b57'; }
   else if (score < 1)   { grade = '거의 안 남';      color = '#7cb342'; }
-  else if (score < 4)   { grade = '냄새 주의';       color = '#e6a700'; }
-  else if (score < 10)  { grade = '냄새 구간';       color = '#e2542c'; }
-  else                  { grade = '냄새 밀집 구간';  color = '#b3261e'; }
+  else if (score < 4)   { grade = '냄새 주의';       color = '#cf9a06'; }
+  else if (score < 10)  { grade = '냄새 구간';       color = '#d0491f'; }
+  else                  { grade = '냄새 밀집 구간';  color = '#a32c12'; }
   return { score, grade, color, female: f.length, unknown: u.length, radius: R };
 }
 
@@ -332,7 +374,7 @@ map.on('load', async () => {
   const noiseColor = hour => ['case',
     ['<', ['at', hour, ['get', 'h']], 0], 'rgba(150,158,166,.5)',
     ['step', ['at', hour, ['get', 'h']],
-      '#3f9b57', 45, '#9aba3b', 55, '#e6a700', 65, '#d43d24']];
+      '#3f9b57', 45, '#9aba3b', 55, '#cf9a06', 65, '#c23a1c']];
   let curHour = new Date().getHours();
   map.addLayer({
     id: 'noise-dots', type: 'circle', source: 'noise',
@@ -392,7 +434,7 @@ map.on('load', async () => {
     layout: { visibility: 'none' },
     paint: {
       'circle-radius': ['interpolate', ['linear'], ['zoom'], 10, 2.5, 14, 6, 17, 12],
-      'circle-color': '#1273b8',
+      'circle-color': '#33658a',
       'circle-opacity': 0.88
     }
   });
@@ -445,7 +487,7 @@ map.on('load', async () => {
     if (mode !== 'trees' || e.defaultPrevented) return;
     const { lng, lat } = e.lngLat;
     if (clickMarker) clickMarker.remove();
-    clickMarker = new maplibregl.Marker({ color: '#1c2733', scale: 0.8 })
+    clickMarker = new maplibregl.Marker({ color: '#2b2926', scale: 0.8 })
       .setLngLat([lng, lat]).addTo(map);
     showSmell(lng, lat, '선택한 지점 기준');
   });
