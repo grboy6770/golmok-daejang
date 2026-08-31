@@ -91,6 +91,9 @@
   }
   #btn-locate:active { transform: translate(2px, 2px); box-shadow: none; }
 
+  /* 내가 바라보는 방향 — 파란 점 바깥(반지름 11~46px)에만 그려 점을 가리지 않는다 */
+  .golmok-heading-cone { width: 92px; height: 92px; pointer-events: none; }
+
   #hour-row { display: flex; align-items: center; gap: 10px; margin: 4px 0 4px; font-size: 13px; }
   #hour-play {
     width: 30px; height: 30px; flex: 0 0 auto; border: 1.5px solid var(--ink);
@@ -246,9 +249,117 @@ const map = new maplibregl.Map({
 });
 map.addControl(new maplibregl.NavigationControl(), 'top-right');
 const geolocate = new maplibregl.GeolocateControl({
-  positionOptions: { enableHighAccuracy: true }, trackUserLocation: true
+  positionOptions: { enableHighAccuracy: true }, trackUserLocation: true,
+  // 컨트롤이 위치마다 다시 맞추는 확대는 애니메이션 없이 즉시 끝내고, 바로 아래에서 우리가 되돌린다
+  fitBoundsOptions: { animate: false }
 });
 map.addControl(geolocate, 'top-right');
+
+/* ───── 내 위치 따라가기 + 바라보는 방향 ─────────────────────────────
+   followState : 'off' 추적 꺼짐 / 'locked' 화면이 따라가는 중 / 'background' 지도를 만져 잠금이 풀린 중
+   followZoom  : 따라갈 때 유지할 확대 단계. 사용자가 직접 바꾼 값만 기록한다.
+   lastFix     : 마지막으로 받은 좌표. 방위가 좌표보다 늦게 와도 부채꼴을 붙이기 위해 들고 있는다.
+   ─ GeolocateControl 은 잠금이 풀린 뒤에도 위치 이벤트를 계속 보내므로,
+     위치 이벤트에서 followState 를 건드리면 안 된다(자동 재개 규칙이 무너진다). */
+const RELOCK_MS = 8000;
+let followState = 'off';
+let followZoom = map.getZoom();
+let relockTimer = null;
+let headingDeg = null;
+let headingState = 'idle';   // idle → pending → on | denied
+let coneMarker = null;
+let coneAttached = false;
+let lastFix = null;
+
+// 사용자가 직접 확대를 바꿨을 때만 기록한다(컨트롤과 우리가 일으킨 이동은 geolocateSource 로 걸러진다)
+map.on('zoomend', e => { if (!e.geolocateSource) followZoom = map.getZoom(); });
+
+// 잠금이 풀린 뒤 지도를 또 만지면 8초를 처음부터 다시 센다
+map.on('movestart', e => { if (!e.geolocateSource && followState === 'background') armRelock(); });
+
+function cancelRelock() { clearTimeout(relockTimer); relockTimer = null; }
+function armRelock() {
+  cancelRelock();
+  relockTimer = setTimeout(() => {
+    relockTimer = null;
+    if (followState !== 'background') return;
+    followZoom = map.getZoom();
+    geolocate.trigger();
+  }, RELOCK_MS);
+}
+
+geolocate.on('trackuserlocationstart', () => {
+  followState = 'locked';
+  enableHeading();   // 버튼 클릭에서 동기로 이어진 자리 — iOS 방위 권한은 여기서만 물을 수 있다
+});
+geolocate.on('userlocationlostfocus', () => {   // 잠금만 풀림(추적은 계속)
+  followState = 'background';
+  armRelock();
+});
+geolocate.on('userlocationfocus', () => {       // 다시 잠김
+  followState = 'locked';
+  cancelRelock();
+  // 재잠금은 위치 이벤트 없이 확대를 다시 맞춰 버리므로 여기서 되돌린다
+  map.jumpTo({ zoom: followZoom }, { geolocateSource: true, golmokFollow: true });
+});
+geolocate.on('trackuserlocationend', () => {
+  followState = 'off';
+  cancelRelock();
+  // 이 이벤트는 '지도를 만져 잠금이 풀림' 때도 먼저 오고 바로 뒤에 lostfocus 가 따라온다.
+  // 그래서 판정을 마이크로태스크로 미뤄, 진짜로 꺼진 경우에만 부채꼴을 지운다.
+  queueMicrotask(() => { if (followState === 'off') { hideCone(); lastFix = null; } });
+});
+
+function enableHeading() {
+  if (headingState !== 'idle') return;
+  if (!window.DeviceOrientationEvent) { headingState = 'denied'; return; }
+  headingState = 'pending';   // 같은 클릭에서 두 번 불려도 여기서 걸러진다
+  if (typeof DeviceOrientationEvent.requestPermission === 'function') {
+    DeviceOrientationEvent.requestPermission()
+      .then(r => { if (r === 'granted') attachOrient(); else headingState = 'denied'; })
+      .catch(() => { headingState = 'denied'; });   // 거부는 조용히 넘어간다
+  } else {
+    attachOrient();
+  }
+}
+function attachOrient() {
+  window.addEventListener('deviceorientationabsolute', onOrient);
+  window.addEventListener('deviceorientation', onOrient);
+  headingState = 'on';
+}
+function onOrient(e) {
+  let h = (typeof e.webkitCompassHeading === 'number')
+    ? e.webkitCompassHeading                                        // iOS
+    : ((e.absolute && typeof e.alpha === 'number') ? 360 - e.alpha : null);
+  if (h === null || !isFinite(h)) return;                           // 값이 없는 기기는 아무것도 그리지 않는다
+  headingDeg = (h + (screen.orientation ? screen.orientation.angle : 0) + 360) % 360;
+  if (coneAttached) coneMarker.setRotation(headingDeg);
+  else if (lastFix) placeCone(lastFix[0], lastFix[1]);              // 좌표가 먼저 와 있던 경우
+}
+function placeCone(lng, lat) {
+  if (headingDeg === null) return;                                  // 방위를 모르면 표시하지 않는다
+  if (!coneMarker) {
+    const el = document.createElement('div');
+    el.className = 'golmok-heading-cone';
+    el.innerHTML =
+      '<svg width="92" height="92" viewBox="0 0 92 92" aria-hidden="true">' +
+      '<defs><radialGradient id="golmok-cone-g" cx="50%" cy="50%" r="50%">' +
+      '<stop offset="24%" stop-color="#1da1f2" stop-opacity=".55"/>' +
+      '<stop offset="100%" stop-color="#1da1f2" stop-opacity="0"/>' +
+      '</radialGradient></defs>' +
+      // 중심(46,46) 기준 위쪽 ±30°, 반지름 11~46 의 부채꼴. 안쪽 11px 를 비워 파란 점을 가리지 않는다
+      '<path d="M40.5 36.5 A11 11 0 0 1 51.5 36.5 L69 6.2 A46 46 0 0 0 23 6.2 Z"' +
+      ' fill="url(#golmok-cone-g)"/></svg>';
+    coneMarker = new maplibregl.Marker({
+      element: el, rotationAlignment: 'map', pitchAlignment: 'map', anchor: 'center'
+    });
+  }
+  coneMarker.setLngLat([lng, lat]).setRotation(headingDeg);
+  if (!coneAttached) { coneMarker.addTo(map); coneAttached = true; }
+}
+function hideCone() {
+  if (coneAttached) { coneMarker.remove(); coneAttached = false; }
+}
 
 // 패널 접기/펴기 — 좁은 화면(폰)에서는 접힌 상태로 시작해 지도를 가리지 않는다
 const panelEl = document.querySelector('.panel');
@@ -631,8 +742,15 @@ map.on('load', async () => {
     showSmell(lng, lat, '선택한 지점 기준');
   });
 
-  // 내 위치 추적 → 위치 갱신마다 냄새 판정 + 지도 이동(파란 점은 GeolocateControl이 표시)
+  // 내 위치 추적 → 위치 갱신마다 화면 따라가기 + 방향 부채꼴 + (은행나무 편에서만) 냄새 판정
   geolocate.on('geolocate', pos => {
+    lastFix = [pos.coords.longitude, pos.coords.latitude];
+    // geolocateSource 를 실어야 이 이동이 스스로 잠금을 푸는 것을 막는다
+    if (followState === 'locked') {
+      map.jumpTo({ center: lastFix, zoom: followZoom },
+        { geolocateSource: true, golmokFollow: true });
+    }
+    placeCone(lastFix[0], lastFix[1]);
     if (mode !== 'trees') return;
     if (clickMarker) { clickMarker.remove(); clickMarker = null; }
     showSmell(pos.coords.longitude, pos.coords.latitude, '내 위치 기준 (이동하면 자동 갱신)');
@@ -647,7 +765,12 @@ map.on('load', async () => {
     document.getElementById('smell-season').textContent = '';
     card.classList.add('show');
   });
-  document.getElementById('btn-locate').addEventListener('click', () => geolocate.trigger());
+  // '내 위치로 이동'은 글자 그대로만 동작한다 — 이미 따라오는 중이면 아무 일도 하지 않는다.
+  // (추적 끄기는 지도 우상단 GeolocateControl 버튼 담당)
+  document.getElementById('btn-locate').addEventListener('click', () => {
+    if (followState !== 'locked') geolocate.trigger();
+    enableHeading();   // 클릭에서 동기로 불러야 iOS 방위 권한을 물을 수 있다
+  });
 });
 </script>
 </body>
