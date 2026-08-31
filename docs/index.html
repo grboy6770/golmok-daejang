@@ -262,8 +262,9 @@ map.addControl(geolocate, 'top-right');
    ─ GeolocateControl 은 잠금이 풀린 뒤에도 위치 이벤트를 계속 보내므로,
      위치 이벤트에서 followState 를 건드리면 안 된다(자동 재개 규칙이 무너진다). */
 const RELOCK_MS = 8000;
-const LOCATE_ZOOM = 18;   // '내 위치로 이동'을 눌렀을 때 최소한 이만큼은 당겨 준다(이미 더 가까우면 그대로)
-                          // 18 = 가게·건물 이름이 개별로 읽히는 단계(실측: harness/measure_zoom_labels.mjs)
+const LOCATE_ZOOM = 19;   // '내 위치로 이동'을 눌렀을 때 최소한 이만큼은 당겨 준다(이미 더 가까우면 그대로)
+                          // 19 = 새 가게 이름이 등장하는 마지막 단계. 20 이상은 신규 0개, 확대만 됨
+                          // (실측: harness/measure_zoom_labels.mjs · measure_zoom_high.mjs)
 let followState = 'off';
 let followZoom = map.getZoom();
 let relockTimer = null;
