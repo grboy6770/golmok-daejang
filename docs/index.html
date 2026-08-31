@@ -262,6 +262,7 @@ map.addControl(geolocate, 'top-right');
    ─ GeolocateControl 은 잠금이 풀린 뒤에도 위치 이벤트를 계속 보내므로,
      위치 이벤트에서 followState 를 건드리면 안 된다(자동 재개 규칙이 무너진다). */
 const RELOCK_MS = 8000;
+const LOCATE_ZOOM = 17;   // '내 위치로 이동'을 눌렀을 때 최소한 이만큼은 당겨 준다(이미 더 가까우면 그대로)
 let followState = 'off';
 let followZoom = map.getZoom();
 let relockTimer = null;
@@ -768,7 +769,15 @@ map.on('load', async () => {
   // '내 위치로 이동'은 글자 그대로만 동작한다 — 이미 따라오는 중이면 아무 일도 하지 않는다.
   // (추적 끄기는 지도 우상단 GeolocateControl 버튼 담당)
   document.getElementById('btn-locate').addEventListener('click', () => {
-    if (followState !== 'locked') geolocate.trigger();
+    // 화면이 기준보다 멀 때만 당긴다. 상태 분기보다 먼저 정해야 어느 경로로 가든 같은 값을 쓴다.
+    if (map.getZoom() < LOCATE_ZOOM) followZoom = LOCATE_ZOOM;
+    if (followState !== 'locked') {
+      geolocate.trigger();   // 꺼짐 → 첫 좌표에서, 배경 → userlocationfocus 에서 followZoom 이 적용된다
+    } else {
+      // 이미 따라오는 중이면 컨트롤 이벤트가 안 나므로 여기서 직접 반영한다(추적은 끄지 않는다)
+      map.jumpTo(lastFix ? { center: lastFix, zoom: followZoom } : { zoom: followZoom },
+        { geolocateSource: true, golmokFollow: true });
+    }
     enableHeading();   // 클릭에서 동기로 불러야 iOS 방위 권한을 물을 수 있다
   });
 });
