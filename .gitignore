@@ -7,3 +7,4 @@ data/raw/sdot_*.csv
 data/raw/trees_api.json
 data/raw/trees_api/
 data/raw/trees_2026.xlsx
+.private/
