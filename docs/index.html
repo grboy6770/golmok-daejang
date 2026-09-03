@@ -4,9 +4,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>골목대장 — 서울 골목 생활 지도</title>
-<meta name="description" content="가을 은행 냄새 구간, 시간대별 골목 소음, 길거리 쓰레기통과 의류수거함. 서울 골목 사정을 미리 보는 지도.">
+<meta name="description" content="시간대별 골목 소음, 길거리 쓰레기통과 의류수거함. 서울 골목 사정을 미리 보는 지도.">
 <meta property="og:title" content="골목대장">
-<meta property="og:description" content="가을 은행 냄새 구간, 시간대별 골목 소음, 길거리 쓰레기통·의류수거함 — 서울 골목 사정을 미리 보는 지도">
+<meta property="og:description" content="시간대별 골목 소음, 길거리 쓰레기통·의류수거함 — 서울 골목 사정을 미리 보는 지도">
 <meta property="og:url" content="https://grboy6770.github.io/golmok-daejang/">
 <link rel="icon" type="image/png" href="assets/favicon-64.png">
 <link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
@@ -25,8 +25,7 @@
     --ink: #2b2926;
     --ink-soft: #6b6459;
     --line: #d8cfbc;
-    --ginkgo: #e8b40c;
-    --smell: #d0491f;
+    --accent: #e8b40c;
     --shadow: 4px 4px 0 rgba(43, 41, 38, .22);
   }
   * { box-sizing: border-box; }
@@ -74,8 +73,6 @@
   .layer-row { display: flex; align-items: center; gap: 8px; font-size: 13.5px; padding: 4px 0; cursor: pointer; user-select: none; }
   .layer-row input { accent-color: var(--ink); }
   .swatch { width: 12px; height: 12px; border-radius: 50%; flex: 0 0 auto; border: 1px solid rgba(43,41,38,.35); }
-  .swatch.female { background: var(--smell); }
-  .swatch.unknown { background: var(--ginkgo); }
   .count { margin-left: auto; color: var(--ink-soft); font-variant-numeric: tabular-nums; font-size: 12.5px; }
 
   .hint { font-size: 11.5px; color: var(--ink-soft); margin: 8px 0 0; padding-top: 6px; line-height: 1.55; }
@@ -85,7 +82,7 @@
   #btn-locate {
     display: block; width: 100%; margin: 12px 0 0; padding: 9px 0 8px;
     border: 1.5px solid var(--ink); border-radius: 999px;
-    background: var(--ginkgo); color: var(--ink);
+    background: var(--accent); color: var(--ink);
     font-size: 15px; font-family: "Jua", sans-serif; cursor: pointer;
     box-shadow: 2.5px 2.5px 0 rgba(43, 41, 38, .28);
   }
@@ -109,18 +106,18 @@
   }
   .noise-legend span { flex: 1; padding: 3.5px 0; }
 
-  #smell-card {
+  /* 안내 카드 — 위치를 못 가져왔을 때 등 짧은 상태 메시지 */
+  #notice-card {
     position: absolute; left: 14px; bottom: 30px; z-index: 10;
     background: var(--paper); border: 1.5px solid var(--ink); border-radius: 10px;
     padding: 12px 16px; box-shadow: var(--shadow); max-width: 324px;
     display: none;
   }
-  #smell-card.show { display: block; }
-  #smell-card .grade { font-family: "Jua", sans-serif; font-size: 19px; margin: 0 0 3px; display: flex; align-items: center; gap: 8px; }
-  #smell-card .grade .dot { width: 13px; height: 13px; border-radius: 50%; border: 1px solid rgba(43,41,38,.35); }
-  #smell-card .detail { font-size: 12.5px; color: #4a443b; margin: 0; line-height: 1.6; }
-  #smell-card .season { font-size: 11.5px; color: var(--ink-soft); margin: 7px 0 0; border-top: 1px dashed var(--line); padding-top: 7px; line-height: 1.55; }
-  #smell-card .where { font-size: 11px; color: #99917f; margin: 1px 0 6px; }
+  #notice-card.show { display: block; }
+  #notice-card .grade { font-family: "Jua", sans-serif; font-size: 19px; margin: 0 0 3px; display: flex; align-items: center; gap: 8px; }
+  #notice-card .grade .dot { width: 13px; height: 13px; border-radius: 50%; border: 1px solid rgba(43,41,38,.35); }
+  #notice-card .detail { font-size: 12.5px; color: #4a443b; margin: 0; line-height: 1.6; }
+  #notice-card .where { font-size: 11px; color: #99917f; margin: 1px 0 6px; }
 
   .credit {
     position: absolute; bottom: 5px; left: 10px; z-index: 10;
@@ -147,7 +144,7 @@
   @media (max-width: 480px) {
     .panel { max-width: calc(100vw - 28px); padding: 12px 14px 14px; }
     .panel h1 { font-size: 23px; }
-    #smell-card { max-width: calc(100vw - 28px); }
+    #notice-card { max-width: calc(100vw - 28px); }
   }
 </style>
 </head>
@@ -163,27 +160,8 @@
   </h1>
   <div id="panel-body">
   <div class="tabs">
-    <button id="tab-trees" class="on">은행나무</button>
     <button id="tab-noise">소음</button>
-    <button id="tab-bins">쓰레기통</button>
-  </div>
-
-  <div id="mode-trees-ui">
-    <p class="tagline">가을 은행 냄새, 밟기 전에 미리 보기.<br>서울 가로수 은행나무 <span id="tagline-trees"></span>그루의 위치입니다.</p>
-    <label class="layer-row"><input type="checkbox" id="toggle-trees" checked>
-      <span class="swatch unknown"></span> 은행나무 <span class="count" id="count-trees"></span></label>
-    <label class="layer-row"><input type="checkbox" id="toggle-smell" checked>
-      <span class="swatch female"></span> 냄새 구간 <span class="count" id="count-smell"></span></label>
-    <p class="hint">지도를 탭하면 그 지점의 냄새 정도를 알려줍니다.</p>
-    <details>
-      <summary>냄새 구간은 어떻게 정했나요?</summary>
-      <p>은행 냄새는 열매가 떨어져 터질 때 납니다. 열매는 은행나무 중에서도
-      암나무에만 열리는데, 서울시 데이터에 암나무로 기록된 <span id="detail-female"></span>그루 주변을
-      빨간 냄새 구간으로 표시했습니다.</p>
-      <p>단, 자치구 8곳(성동·강북·은평·서대문·마포·강서·영등포·서초)은
-      암나무 기록이 없어서 그 지역은 냄새 구간이 비어 보일 수 있습니다.
-      노란 나무 중에도 열매 맺는 나무가 대략 4그루에 1그루꼴로 섞여 있습니다.</p>
-    </details>
+    <button id="tab-bins" class="on">쓰레기통</button>
   </div>
 
   <div id="mode-noise-ui" style="display:none">
@@ -208,7 +186,7 @@
     </details>
   </div>
 
-  <div id="mode-bins-ui" style="display:none">
+  <div id="mode-bins-ui">
     <p class="tagline">버릴 곳 찾기 — 길거리 쓰레기통과 의류수거함의 위치입니다.</p>
     <label class="layer-row"><input type="checkbox" id="toggle-bins" checked>
       <span class="swatch" style="background:#33658a"></span> 쓰레기통 <span class="count" id="count-bins"></span></label>
@@ -224,19 +202,19 @@
     </details>
   </div>
 
+  <p class="hint" id="notice-removed">은행나무 편은 서울시 가로수 데이터 이용조건(공공누리 4유형)에 따라 2026년 9월에 내렸습니다.</p>
   <button id="btn-locate">내 위치로 이동</button>
   </div><!-- /panel-body -->
 </div>
 
-<div id="smell-card">
-  <p class="grade"><span class="dot" id="smell-dot"></span><span id="smell-grade"></span></p>
-  <p class="where" id="smell-where"></p>
-  <p class="detail" id="smell-detail"></p>
-  <p class="season" id="smell-season"></p>
+<div id="notice-card">
+  <p class="grade"><span class="dot" id="notice-dot"></span><span id="notice-grade"></span></p>
+  <p class="where" id="notice-where"></p>
+  <p class="detail" id="notice-detail"></p>
 </div>
 
 <div class="credit">
-  데이터: <a href="https://data.seoul.go.kr" target="_blank" rel="noopener">서울 열린데이터광장</a> (가로수 2026-04 · 소음 최근 4주 · 쓰레기통 2025-11)
+  데이터: <a href="https://data.seoul.go.kr" target="_blank" rel="noopener">서울 열린데이터광장</a> (소음 최근 4주 · 쓰레기통 2025-11 · 의류수거함 2026-08)
 </div>
 
 <script>
@@ -369,94 +347,21 @@ const panelEl = document.querySelector('.panel');
 document.getElementById('panel-head').addEventListener('click', () => panelEl.classList.toggle('collapsed'));
 if (window.matchMedia('(max-width: 480px)').matches) panelEl.classList.add('collapsed');
 
-const DATA_V = '20260826a'; // 데이터 갱신 시 함께 올려 브라우저 캐시를 우회
-function toGeojson(coords) {
-  return {
-    type: 'FeatureCollection',
-    features: coords.map(c => ({ type: 'Feature', geometry: { type: 'Point', coordinates: c }, properties: {} }))
-  };
-}
+const DATA_V = '20260903a'; // 데이터 갱신 시 함께 올려 브라우저 캐시를 우회
 
-/* ---------- 냄새 판정 ----------
- * 격자 색인(약 110m 셀)으로 반경 내 나무를 빠르게 센다.
- * 점수 = 암나무(거리 가중) + 미상 은행나무 × 0.24(서울시 발표 암나무 비율 근사)
- */
-const CELL = 0.001; // 도(degree) — 위도 0.001° ≈ 111m
-const grid = { female: new Map(), unknown: new Map() };
-let treeData = null;
-
-function cellKey(lon, lat) { return Math.floor(lon / CELL) + ',' + Math.floor(lat / CELL); }
-function buildGrid(kind, coords) {
-  const g = grid[kind];
-  for (const c of coords) {
-    const k = cellKey(c[0], c[1]);
-    let arr = g.get(k);
-    if (!arr) { arr = []; g.set(k, arr); }
-    arr.push(c);
-  }
-}
-function metersBetween(lon1, lat1, lon2, lat2) {
-  const kx = 111320 * Math.cos(lat1 * Math.PI / 180), ky = 110574;
-  const dx = (lon2 - lon1) * kx, dy = (lat2 - lat1) * ky;
-  return Math.sqrt(dx * dx + dy * dy);
-}
-function nearby(kind, lon, lat, radius) {
-  const g = grid[kind], out = [];
-  const span = Math.ceil(radius / 100000 / CELL) + 1;
-  const cx = Math.floor(lon / CELL), cy = Math.floor(lat / CELL);
-  for (let i = cx - span; i <= cx + span; i++) {
-    for (let j = cy - span; j <= cy + span; j++) {
-      const arr = g.get(i + ',' + j);
-      if (!arr) continue;
-      for (const c of arr) {
-        const d = metersBetween(lon, lat, c[0], c[1]);
-        if (d <= radius) out.push(d);
-      }
-    }
-  }
-  return out;
-}
-function distWeight(d) { return d <= 50 ? 1 : d <= 100 ? 0.5 : 0.25; }
-
-function smellAt(lon, lat) {
-  const R = 150;
-  const f = nearby('female', lon, lat, R);
-  const u = nearby('unknown', lon, lat, R);
-  const score = f.reduce((s, d) => s + distWeight(d), 0)
-              + 0.24 * u.reduce((s, d) => s + distWeight(d), 0);
-  let grade, color;
-  if (score === 0)      { grade = '은행나무 없음';   color = '#3f9b57'; }
-  else if (score < 1)   { grade = '거의 안 남';      color = '#7cb342'; }
-  else if (score < 4)   { grade = '냄새 주의';       color = '#cf9a06'; }
-  else if (score < 10)  { grade = '냄새 구간';       color = '#d0491f'; }
-  else                  { grade = '냄새 밀집 구간';  color = '#a32c12'; }
-  return { score, grade, color, female: f.length, unknown: u.length, radius: R };
-}
-
-const SEASON_MSG = (() => {
-  const m = new Date().getMonth() + 1;
-  if (m >= 9 && m <= 11) return '지금은 은행 열매 철(9~11월)입니다. 표시 구간을 지날 때 발밑을 조심하세요.';
-  return '은행 열매 냄새는 9~11월에 납니다. 지금은 철이 아니라 냄새가 없거나 약합니다.';
-})();
-
-let clickMarker = null;
-function showSmell(lon, lat, label) {
-  if (!treeData) return;
-  const r = smellAt(lon, lat);
-  document.getElementById('smell-dot').style.background = r.color;
-  document.getElementById('smell-grade').textContent = r.grade;
-  document.getElementById('smell-where').textContent = label;
-  document.getElementById('smell-detail').textContent =
-    `반경 ${r.radius}m 안 은행나무 ${r.female + r.unknown}그루 · 그중 열매 맺는 나무(기록 기준) ${r.female}그루`;
-  document.getElementById('smell-season').textContent = SEASON_MSG;
-  document.getElementById('smell-card').classList.add('show');
-}
+// 체크박스 하나가 레이어 여러 개의 표시/숨김을 맡는다
+const bind = (checkboxId, layerIds) => {
+  document.getElementById(checkboxId).addEventListener('change', e => {
+    const v = e.target.checked ? 'visible' : 'none';
+    layerIds.forEach(id => map.setLayoutProperty(id, 'visibility', v));
+  });
+};
 
 map.on('load', async () => {
   // 데이터 레이어를 지명·도로명 라벨 아래에 끼워 넣어 라벨이 항상 읽히게 한다
   const labelLayerId = map.getStyle().layers.find(l => l.type === 'symbol')?.id;
   const addLayer = def => map.addLayer(def, labelLayerId);
-  // 배경 도로의 주황·노랑이 은행나무 표시와 겹치므로 도로 계열 선 색을 회백색으로 통일
+  // 배경 도로의 주황·노랑이 데이터 점 색과 겹치므로 도로 계열 선 색을 회백색으로 통일
   for (const l of map.getStyle().layers) {
     if (l.type === 'line' && /highway|bridge|tunnel|road|rail/.test(l.id)) {
       try { map.setPaintProperty(l.id, 'line-color', '#ddd6c8'); } catch (_) {}
@@ -475,62 +380,6 @@ map.on('load', async () => {
   // 배경과 라벨 사이 얇은 종이색 막 — 전체 색을 한 톤 가라앉힘
   addLayer({ id: 'base-dim', type: 'background',
     paint: { 'background-color': '#faf5ea', 'background-opacity': 0.3 } });
-
-  const res = await fetch('data/ginkgo.json?v=' + DATA_V);
-  treeData = await res.json();
-  const allTrees = treeData.female.concat(treeData.unknown);
-  document.getElementById('count-trees').textContent = allTrees.length.toLocaleString() + '그루';
-  document.getElementById('tagline-trees').textContent = allTrees.length.toLocaleString();
-  document.getElementById('detail-female').textContent = treeData.female.length.toLocaleString();
-  buildGrid('female', treeData.female);
-  buildGrid('unknown', treeData.unknown);
-
-  map.addSource('trees', { type: 'geojson', data: toGeojson(allTrees) });
-  map.addSource('smell', { type: 'geojson', data: toGeojson(treeData.female) });
-
-  // 줌 아웃: 은행나무 전체(노랑) 열지도
-  addLayer({
-    id: 'trees-heat', type: 'heatmap', source: 'trees', maxzoom: 15,
-    paint: {
-      'heatmap-radius': ['interpolate', ['linear'], ['zoom'], 10, 3, 14, 12],
-      'heatmap-intensity': ['interpolate', ['linear'], ['zoom'], 10, 0.14, 14, 0.6],
-      'heatmap-opacity': ['interpolate', ['linear'], ['zoom'], 13, 0.7, 15, 0],
-      'heatmap-color': ['interpolate', ['linear'], ['heatmap-density'],
-        0, 'rgba(216,168,0,0)', 0.2, 'rgba(240,210,110,.4)',
-        0.55, 'rgba(226,180,40,.6)', 1, 'rgba(200,150,0,.75)']
-    }
-  });
-  // 냄새 구간(빨강): 열매 맺는 나무 주변 — 줌 인해도 구역 표시 유지
-  addLayer({
-    id: 'smell-heat', type: 'heatmap', source: 'smell',
-    paint: {
-      'heatmap-radius': ['interpolate', ['exponential', 2], ['zoom'],
-        10, 3.5, 14, 16, 16, 55, 18, 200],
-      'heatmap-intensity': ['interpolate', ['linear'], ['zoom'], 10, 0.25, 14, 0.9, 18, 1.1],
-      'heatmap-opacity': 0.75,
-      'heatmap-color': ['interpolate', ['linear'], ['heatmap-density'],
-        0, 'rgba(226,84,44,0)', 0.15, 'rgba(250,170,110,.45)',
-        0.45, 'rgba(240,120,60,.7)', 0.75, 'rgba(226,84,44,.85)', 1, 'rgba(185,40,15,.95)']
-    }
-  });
-  // 줌 인: 개별 나무 (전부 같은 노란 점, 테두리 없음)
-  addLayer({
-    id: 'trees-dots', type: 'circle', source: 'trees', minzoom: 12.5,
-    paint: {
-      'circle-radius': ['interpolate', ['linear'], ['zoom'], 13, 2, 17, 6],
-      'circle-color': '#d8a800',
-      'circle-opacity': ['interpolate', ['linear'], ['zoom'], 12.5, 0, 13.5, 0.85]
-    }
-  });
-
-  const bind = (checkboxId, layerIds) => {
-    document.getElementById(checkboxId).addEventListener('change', e => {
-      const v = e.target.checked ? 'visible' : 'none';
-      layerIds.forEach(id => map.setLayoutProperty(id, 'visibility', v));
-    });
-  };
-  bind('toggle-trees', ['trees-heat', 'trees-dots']);
-  bind('toggle-smell', ['smell-heat']);
 
   /* ---------- 골목 소음 모드 ---------- */
   const noiseRes = await fetch('data/noise.json?v=' + DATA_V);
@@ -677,39 +526,31 @@ map.on('load', async () => {
   map.on('mouseleave', 'clothes-dots', () => { map.getCanvas().style.cursor = ''; });
 
   /* ---------- 모드 전환 ---------- */
-  let mode = 'trees';
-  const treesLayers = ['trees-heat', 'smell-heat', 'trees-dots'];
+  const DEFAULT_MODE = 'bins';
+  let mode = DEFAULT_MODE;
   const setMode = m => {
     mode = m;
-    for (const name of ['trees', 'noise', 'bins']) {
+    for (const name of ['noise', 'bins']) {
       document.getElementById('mode-' + name + '-ui').style.display = m === name ? '' : 'none';
       document.getElementById('tab-' + name).classList.toggle('on', m === name);
     }
-    treesLayers.forEach(id => map.setLayoutProperty(id, 'visibility', 'none'));
     ['noise-dots', 'bins-dots', 'clothes-dots'].forEach(id => map.setLayoutProperty(id, 'visibility', 'none'));
     if (noisePopup) { noisePopup.remove(); noisePopup = null; }
     if (binsPopup) { binsPopup.remove(); binsPopup = null; }
+    document.getElementById('notice-card').classList.remove('show');
     const checked = id => document.getElementById(id).checked ? 'visible' : 'none';
-    if (m === 'trees') {
-      map.setLayoutProperty('trees-heat', 'visibility', checked('toggle-trees'));
-      map.setLayoutProperty('trees-dots', 'visibility', checked('toggle-trees'));
-      map.setLayoutProperty('smell-heat', 'visibility', checked('toggle-smell'));
+    if (m === 'noise') {
+      map.setLayoutProperty('noise-dots', 'visibility', 'visible');
     } else {
-      document.getElementById('smell-card').classList.remove('show');
-      if (clickMarker) { clickMarker.remove(); clickMarker = null; }
-      if (m === 'noise') {
-        map.setLayoutProperty('noise-dots', 'visibility', 'visible');
-      } else {
-        map.setLayoutProperty('bins-dots', 'visibility', checked('toggle-bins'));
-        map.setLayoutProperty('clothes-dots', 'visibility', checked('toggle-clothes'));
-      }
+      map.setLayoutProperty('bins-dots', 'visibility', checked('toggle-bins'));
+      map.setLayoutProperty('clothes-dots', 'visibility', checked('toggle-clothes'));
     }
   };
   bind('toggle-bins', ['bins-dots']);
   bind('toggle-clothes', ['clothes-dots']);
-  document.getElementById('tab-trees').addEventListener('click', () => { setMode('trees'); updateHash(); });
   document.getElementById('tab-noise').addEventListener('click', () => { setMode('noise'); updateHash(); });
   document.getElementById('tab-bins').addEventListener('click', () => { setMode('bins'); updateHash(); });
+  setMode(DEFAULT_MODE);   // 주소 해시가 없거나 못 읽으면 이 탭으로 시작한다
 
   /* ---------- 화면 상태 공유 (주소 해시) ----------
    * #탭/줌/위도/경도[/시] — 링크를 받은 사람이 같은 화면을 본다 */
@@ -723,8 +564,9 @@ map.on('load', async () => {
   (function applyHash() {
     const p = location.hash.slice(1).split('/');
     if (p.length < 4) return;
-    const [m, z, lat, lng, hr] = p;
-    if (!['trees', 'noise', 'bins'].includes(m)) return;
+    let [m, z, lat, lng, hr] = p;
+    if (m === 'trees') m = DEFAULT_MODE;   // 내린 은행나무 편의 옛 링크는 기본 탭으로
+    if (!['noise', 'bins'].includes(m)) return;
     const zf = +z, latf = +lat, lngf = +lng;
     if (!isFinite(zf) || !isFinite(latf) || !isFinite(lngf)) return;
     setMode(m);
@@ -735,17 +577,7 @@ map.on('load', async () => {
     }
   })();
 
-  // 지도 탭 → (은행나무 모드에서만) 그 지점 냄새 판정
-  map.on('click', e => {
-    if (mode !== 'trees' || e.defaultPrevented) return;
-    const { lng, lat } = e.lngLat;
-    if (clickMarker) clickMarker.remove();
-    clickMarker = new maplibregl.Marker({ color: '#2b2926', scale: 0.8 })
-      .setLngLat([lng, lat]).addTo(map);
-    showSmell(lng, lat, '선택한 지점 기준');
-  });
-
-  // 내 위치 추적 → 위치 갱신마다 화면 따라가기 + 방향 부채꼴 + (은행나무 편에서만) 냄새 판정
+  // 내 위치 추적 → 위치 갱신마다 화면 따라가기 + 방향 부채꼴
   geolocate.on('geolocate', pos => {
     lastFix = [pos.coords.longitude, pos.coords.latitude];
     // geolocateSource 를 실어야 이 이동이 스스로 잠금을 푸는 것을 막는다
@@ -754,18 +586,14 @@ map.on('load', async () => {
         { geolocateSource: true, golmokFollow: true });
     }
     placeCone(lastFix[0], lastFix[1]);
-    if (mode !== 'trees') return;
-    if (clickMarker) { clickMarker.remove(); clickMarker = null; }
-    showSmell(pos.coords.longitude, pos.coords.latitude, '내 위치 기준 (이동하면 자동 갱신)');
   });
   geolocate.on('error', () => {
-    const card = document.getElementById('smell-card');
-    document.getElementById('smell-dot').style.background = '#8494a5';
-    document.getElementById('smell-grade').textContent = '위치를 가져올 수 없음';
-    document.getElementById('smell-where').textContent = '';
-    document.getElementById('smell-detail').textContent =
+    const card = document.getElementById('notice-card');
+    document.getElementById('notice-dot').style.background = '#8494a5';
+    document.getElementById('notice-grade').textContent = '위치를 가져올 수 없음';
+    document.getElementById('notice-where').textContent = '';
+    document.getElementById('notice-detail').textContent =
       '브라우저의 위치 권한이 꺼져 있거나 거부됐습니다. 주소창 옆 자물쇠(사이트 설정)에서 위치를 허용한 뒤 다시 눌러 주세요.';
-    document.getElementById('smell-season').textContent = '';
     card.classList.add('show');
   });
   // '내 위치로 이동'은 글자 그대로만 동작한다 — 이미 따라오는 중이면 아무 일도 하지 않는다.

@@ -1,7 +1,7 @@
 {
   "name": "골목대장 — 서울 골목 생활 지도",
   "short_name": "골목대장",
-  "description": "가을 은행 냄새 구간, 시간대별 골목 소음, 쓰레기통과 의류수거함",
+  "description": "시간대별 골목 소음, 쓰레기통과 의류수거함",
   "start_url": ".",
   "display": "standalone",
   "background_color": "#faf5ea",

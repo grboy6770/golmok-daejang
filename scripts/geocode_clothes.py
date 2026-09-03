@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """의류수거함 미매칭 주소를 Nominatim으로 지오코딩해 공용 캐시에 누적.
 
-build_clothes.py 와 같은 판정 순서로 좌표를 못 얻은 주소만 골라
+build_clothes.py 와 같은 판정 순서(확정 사전 → Nominatim 캐시)로 좌표를 못 얻은 주소만 골라
 data/cache/nominatim_bins.json 에 추가한다 (초당 1건, 재실행 시 이어서).
 완료 후 build_clothes.py 를 다시 실행하면 반영된다.
 """
@@ -11,13 +11,13 @@ import json
 import sys
 import time
 
-from build_bins import ROOT, locate, road_index_from_trees
+from build_bins import load_caches, lookup
 from build_clothes import ADDR_KEYS, JIBUN_KEYS, LAT_KEYS, LON_KEYS, LON_RANGE, LAT_RANGE, RAW, col, decode
 from geocode_bins import CACHE, query
 
 
 def main() -> None:
-    indexes = road_index_from_trees()
+    addrcache, geocache = load_caches()
     cache = json.loads(CACHE.read_text(encoding="utf-8")) if CACHE.exists() else {}
     todo = []
     seen = set()
@@ -41,9 +41,10 @@ def main() -> None:
                 continue
             addr = (r[i_addr].strip() if i_addr is not None and i_addr < len(r) else "")
             jibun = (r[i_jibun].strip() if i_jibun is not None and i_jibun < len(r) else "")
-            if any(locate(indexes, gu, c) for c in (addr, jibun) if c):
-                continue
+            # build_clothes 와 같은 키·같은 판정 순서
             key = f"{gu} {addr or jibun}".strip()
+            if lookup(addrcache, geocache, key) is not None:
+                continue
             if key and key != gu and key not in cache and key not in seen:
                 seen.add(key)
                 todo.append(key)

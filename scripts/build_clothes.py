@@ -2,8 +2,8 @@
 """자치구별 의류수거함 CSV(19개 구) → docs/data/clothes.json.
 
 - 17개 구는 위도·경도 컬럼을 그대로 사용
-- 좌표가 없는 구(구로·동대문)는 build_bins의 가로수 도로명·지번 색인 +
-  Nominatim 캐시로 지오코딩
+- 좌표가 없는 구(구로·동대문)는 확정 좌표 사전(data/cache/addr_coords.json) →
+  Nominatim 캐시 순으로 지오코딩 (build_bins 와 같은 규칙)
 - 미제공 자치구(2026-08 기준): 도봉·노원·은평·마포·서초·중구 (+ 종로 외 미확인분)
 """
 import csv
@@ -11,11 +11,10 @@ import io
 import json
 from pathlib import Path
 
-from build_bins import ROOT, locate, road_index_from_trees
+from build_bins import ROOT, load_caches, lookup
 
 RAW = ROOT / "data/raw/clothes"
 OUT = ROOT / "docs/data/clothes.json"
-CACHE = ROOT / "data/cache/nominatim_bins.json"
 
 LAT_KEYS = ("위도",)
 LON_KEYS = ("경도",)
@@ -45,10 +44,7 @@ def col(header, keys):
 
 
 def main() -> None:
-    indexes = None  # 필요할 때만 가로수 색인 로드 (수 초 소요)
-    geocache = json.loads(CACHE.read_text(encoding="utf-8")) if CACHE.exists() else {}
-    addr_path = ROOT / "data/cache/addr_coords.json"
-    addrcache = json.loads(addr_path.read_text(encoding="utf-8")) if addr_path.exists() else {}
+    addrcache, geocache = load_caches()
     boxes = []
     unmatched = 0
     per_gu = {}
@@ -73,23 +69,12 @@ def main() -> None:
             addr = (r[i_addr].strip() if i_addr is not None and i_addr < len(r) else "")
             jibun = (r[i_jibun].strip() if i_jibun is not None and i_jibun < len(r) else "")
             if lon is None:
-                # 주소 지오코딩: 도로명 → 지번 → Nominatim 캐시
-                if indexes is None:
-                    indexes = road_index_from_trees()
-                res = None
-                for cand in (addr, jibun):
-                    if cand:
-                        res = locate(indexes, gu, cand)
-                        if res:
-                            break
-                if res is None:
-                    key = f"{gu} {addr or jibun}"
-                    g = geocache.get(key) or addrcache.get(key)
-                    res = (g[0], g[1], "cache") if g else None
+                # 주소 지오코딩: 확정 사전 → Nominatim 캐시
+                res = lookup(addrcache, geocache, f"{gu} {addr or jibun}")
                 if res is None:
                     unmatched += 1
                     continue
-                lon, lat = res[0], res[1]
+                lon, lat = res
             if not (LON_RANGE[0] <= lon <= LON_RANGE[1] and LAT_RANGE[0] <= lat <= LAT_RANGE[1]):
                 unmatched += 1
                 continue

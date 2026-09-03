@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""가로수 사전으로 좌표를 못 찾은 쓰레기통 주소를 Nominatim(OSM)으로 지오코딩.
+"""확정 좌표 사전·Nominatim 캐시로도 좌표를 못 찾은 쓰레기통 주소를 Nominatim(OSM)으로 지오코딩.
 
 - 결과는 data/cache/nominatim_bins.json 에 누적 (주소 -> [lon,lat] 또는 null)
 - 초당 1건 제한(Nominatim 이용정책) 준수. 중단 후 재실행하면 이어서 진행
@@ -13,7 +13,7 @@ import urllib.parse
 import urllib.request
 from pathlib import Path
 
-from build_bins import ADDR_RE, RAW, locate, road_index_from_trees  # noqa: E402
+from build_bins import RAW, load_caches, lookup  # noqa: E402
 
 import openpyxl
 
@@ -40,7 +40,7 @@ def query(addr: str):
 
 
 def main() -> None:
-    index = road_index_from_trees()
+    addrcache, geocache = load_caches()
     wb = openpyxl.load_workbook(RAW / "bins_202511.xlsx", read_only=True)
     ws = wb[wb.sheetnames[0]]
     misses = []
@@ -54,7 +54,7 @@ def main() -> None:
         if key in seen:
             continue
         seen.add(key)
-        if locate(index, gu, addr) is None:
+        if lookup(addrcache, geocache, key) is None:
             misses.append(key)
 
     CACHE.parent.mkdir(parents=True, exist_ok=True)
